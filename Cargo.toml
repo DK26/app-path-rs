@@ -1,0 +1,9 @@
+[package]
+name = "app-path"
+version = "0.1.0"
+edition = "2021"
+description = "Create paths relative to executable location for applications"
+keywords = ["app", "path", "executable", "relative", "local"]
+repository = "https://github.com/DK26/app-path-rs"
+license = "MIT OR Apache-2.0"
+readme = "README.md"
