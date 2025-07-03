@@ -4,7 +4,7 @@
 
 [![Crates.io](https://img.shields.io/crates/v/app-path.svg)](https://crates.io/crates/app-path)
 [![Documentation](https://docs.rs/app-path/badge.svg)](https://docs.rs/app-path)
-[![License](https://img.shields.io/crates/l/app-path.svg)](LICENSE)
+[![License: MIT OR Apache-2.0](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue.svg)](LICENSE-MIT)
 
 ## 🎯 The Problem
 
@@ -91,6 +91,12 @@ let config = AppPath::new("config.toml")?;
 
 ## 📖 Quick Start
 
+Add to your `Cargo.toml`:
+```toml
+[dependencies]
+app-path = "0.1"
+```
+
 ```rust
 use app_path::AppPath;
 use std::fs;
@@ -141,14 +147,14 @@ Override the base directory for testing:
 #[cfg(test)]
 mod tests {
     use app_path::AppPath;
-    use tempfile::tempdir;
+    use std::env;
 
     #[test]
     fn test_config_loading() {
-        let temp = tempdir().unwrap();
+        let temp = env::temp_dir().join("app_path_test");
         let config = AppPath::new("config.toml")
             .unwrap()
-            .with_base(temp.path());
+            .with_base(&temp);
         
         // Test with isolated temporary directory
         assert!(!config.exists());
