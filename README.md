@@ -5,6 +5,7 @@
 [![Crates.io](https://img.shields.io/crates/v/app-path.svg)](https://crates.io/crates/app-path)
 [![Documentation](https://docs.rs/app-path/badge.svg)](https://docs.rs/app-path)
 [![License: MIT OR Apache-2.0](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue.svg)](LICENSE-MIT)
+[![CI](https://github.com/DK26/app-path-rs/workflows/CI/badge.svg)](https://github.com/DK26/app-path-rs/actions)
 
 ## 🎯 The Problem
 
