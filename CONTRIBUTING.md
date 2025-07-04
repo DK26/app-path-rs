@@ -46,6 +46,8 @@ cargo clippy        # Check for issues
 3. Ensure `cargo test && cargo clippy` passes
 4. Submit PR with clear description
 
+**Note**: All PRs automatically run our CI pipeline which tests on Windows, Linux, and macOS with multiple Rust versions.
+
 ### What We Want ✅
 - Bug fixes
 - Performance improvements
