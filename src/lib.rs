@@ -209,6 +209,6 @@ mod tests {
         let rel_path = AppPath::new(rel).unwrap().with_base(&temp_dir);
 
         let expected = temp_dir.join(rel);
-        assert_eq!(format!("{}", rel_path), format!("{}", expected.display()));
+        assert_eq!(format!("{rel_path}"), format!("{}", expected.display()));
     }
 }
