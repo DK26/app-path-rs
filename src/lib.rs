@@ -5,7 +5,7 @@ use std::path::{Path, PathBuf};
 /// All files and directories stay together with the executable.
 #[derive(Clone, Debug)]
 pub struct AppPath {
-    relative_path: PathBuf,
+    input_path: PathBuf,
     full_path: PathBuf,
 }
 
@@ -23,24 +23,24 @@ impl AppPath {
             .to_path_buf();
 
         Ok(Self {
-            relative_path: path.as_ref().to_path_buf(),
+            input_path: path.as_ref().to_path_buf(),
             full_path: exe_dir.join(path),
         })
     }
 
     /// Override the base directory (useful for testing or custom layouts)
     pub fn with_base(mut self, base: impl AsRef<Path>) -> Self {
-        self.full_path = base.as_ref().join(&self.relative_path);
+        self.full_path = base.as_ref().join(&self.input_path);
         self
     }
 
-    /// Get the relative portion of the path
-    pub fn relative(&self) -> &Path {
-        &self.relative_path
+    /// Get the original input path (before resolution)
+    pub fn input(&self) -> &Path {
+        &self.input_path
     }
 
     /// Get the full resolved path
-    pub fn full(&self) -> &Path {
+    pub fn path(&self) -> &Path {
         &self.full_path
     }
 
@@ -65,8 +65,8 @@ impl std::fmt::Display for AppPath {
 }
 
 impl From<AppPath> for PathBuf {
-    fn from(relative_path: AppPath) -> Self {
-        relative_path.full_path
+    fn from(app_path: AppPath) -> Self {
+        app_path.full_path
     }
 }
 impl AsRef<Path> for AppPath {
@@ -157,18 +157,18 @@ mod tests {
     }
 
     #[test]
-    fn test_relative_method() {
+    fn test_input_method() {
         let rel = "config/app.toml";
         let rel_path = AppPath::new(rel).unwrap();
-        assert_eq!(rel_path.relative(), Path::new(rel));
+        assert_eq!(rel_path.input(), Path::new(rel));
     }
 
     #[test]
-    fn test_full_method() {
+    fn test_path_method() {
         let rel = "data/file.txt";
         let temp_dir = env::temp_dir().join("app_path_test_full");
         let rel_path = AppPath::new(rel).unwrap().with_base(&temp_dir);
-        assert_eq!(rel_path.full(), temp_dir.join(rel));
+        assert_eq!(rel_path.path(), temp_dir.join(rel));
     }
 
     #[test]
