@@ -154,6 +154,9 @@ impl AppPath {
     /// // Get the path for use with standard library functions
     /// println!("Config path: {}", config.path().display());
     /// 
+    /// // The path is always absolute
+    /// assert!(config.path().is_absolute());
+    /// 
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
     #[inline]
@@ -194,12 +197,18 @@ impl AppPath {
     /// use app_path::AppPath;
     /// use std::env;
     /// 
+    /// // Use a temporary directory for the example
+    /// let temp_dir = env::temp_dir().join("app_path_example");
     /// let data_file = AppPath::new("data/users/profile.json")?
-    ///     .with_base(env::temp_dir());
+    ///     .with_base(&temp_dir);
     /// 
     /// // Ensure the "data/users" directory exists
     /// data_file.create_dir_all()?;
     /// 
+    /// // Verify the directory was created
+    /// assert!(data_file.path().parent().unwrap().exists());
+    /// 
+    /// # std::fs::remove_dir_all(&temp_dir).ok();
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
     pub fn create_dir_all(&self) -> std::io::Result<()> {
