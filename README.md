@@ -34,7 +34,7 @@ let data = AppPath::new("data/users.db")?;
 // Check if files exist, create directories, etc.
 if !config.exists() {
     config.create_dir_all()?;
-    std::fs::write(config.full(), "default config")?;
+    std::fs::write(config.path(), "default config")?;
 }
 ```
 
@@ -110,13 +110,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     
     // Use them like normal paths
     if config.exists() {
-        let content = fs::read_to_string(config.full())?;
+        let content = fs::read_to_string(config.path())?;
         println!("Config: {}", content);
     }
     
     // Create directories automatically
     logs.create_dir_all()?;
-    fs::write(logs.full(), "Application started\n")?;
+    fs::write(logs.path(), "Application started\n")?;
     
     println!("Config: {}", config);      // Displays full path
     println!("Templates: {}", templates);
