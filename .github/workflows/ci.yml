@@ -20,29 +20,33 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     
+    # Install Rust FIRST, before any cache steps
     - name: Install Rust
       uses: dtolnay/rust-toolchain@stable
       with:
         components: rustfmt, clippy
-    
-    - name: Cache cargo registry
-      uses: actions/cache@v3
-      with:
-        path: ~/.cargo/registry
-        key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
-    
-    - name: Cache cargo index
-      uses: actions/cache@v3
-      with:
-        path: ~/.cargo/git
-        key: ${{ runner.os }}-cargo-index-${{ hashFiles('**/Cargo.lock') }}
-    
-    - name: Cache cargo build
-      uses: actions/cache@v3
-      with:
-        path: target
-        key: ${{ runner.os }}-cargo-build-target-${{ hashFiles('**/Cargo.lock') }}
 
+    # Cache steps AFTER Rust is installed
+    - name: Cache cargo registry
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cargo/registry/index/
+          ~/.cargo/registry/cache/
+          ~/.cargo/git/db/
+        key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-cargo-
+
+    - name: Cache cargo build
+      uses: actions/cache@v4
+      with:
+        path: target/
+        key: ${{ runner.os }}-cargo-build-${{ hashFiles('**/Cargo.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-cargo-build-
+
+    # Run checks and tests
     - name: Check formatting
       run: cargo fmt --all -- --check
 
@@ -54,20 +58,6 @@ jobs:
 
     - name: Run tests (release mode)
       run: cargo test --release --verbose
-
-  msrv:
-    name: Minimum Supported Rust Version
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v4
-    
-    - name: Install Rust 1.70
-      uses: dtolnay/rust-toolchain@master
-      with:
-        toolchain: 1.70.0
-    
-    - name: Check with MSRV
-      run: cargo check --verbose
 
   docs:
     name: Documentation
@@ -82,6 +72,20 @@ jobs:
       run: cargo doc --no-deps --document-private-items --all-features
       env:
         RUSTDOCFLAGS: -D warnings
+
+  msrv:
+    name: Minimum Supported Rust Version
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Install Rust 1.70
+      uses: dtolnay/rust-toolchain@master
+      with:
+        toolchain: 1.70.0
+    
+    - name: Check with MSRV
+      run: cargo check --verbose
 
   security:
     name: Security Audit
