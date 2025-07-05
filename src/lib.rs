@@ -35,16 +35,19 @@ impl AppPath {
     }
 
     /// Get the original input path (before resolution)
+    #[inline]
     pub fn input(&self) -> &Path {
         &self.input_path
     }
 
     /// Get the full resolved path
+    #[inline]
     pub fn path(&self) -> &Path {
         &self.full_path
     }
 
     /// Check if the path exists
+    #[inline]
     pub fn exists(&self) -> bool {
         self.full_path.exists()
     }
@@ -65,6 +68,7 @@ impl std::fmt::Display for AppPath {
 }
 
 impl From<AppPath> for PathBuf {
+    #[inline]
     fn from(app_path: AppPath) -> Self {
         app_path.full_path
     }
