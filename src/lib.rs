@@ -6,13 +6,25 @@
 //!
 //! ```rust
 //! use app_path::AppPath;
+//! use std::convert::TryFrom;
 //!
 //! // Create paths relative to your executable
-//! let config = AppPath::new("config.toml")?;
-//! let data = AppPath::new("data/users.db")?;
+//! let config = AppPath::try_new("config.toml")?;
+//! let data = AppPath::try_new("data/users.db")?;
+//!
+//! // Alternative: Use TryFrom for ergonomic conversions
+//! let logs = AppPath::try_from("logs/app.log")?;
+//! let cache_file = "cache.json".to_string();
+//! let cache = AppPath::try_from(cache_file)?;
 //!
 //! // Get the paths for use with standard library functions
 //! println!("Config: {}", config.path().display());
+//! println!("Data: {}", data.path().display());
+//!
+//! // Check existence and create directories
+//! if !logs.exists() {
+//!     logs.create_dir_all()?;
+//! }
 //!
 //! # Ok::<(), Box<dyn std::error::Error>>(())
 //! ```
@@ -35,8 +47,8 @@ use std::path::{Path, PathBuf};
 /// use app_path::AppPath;
 ///
 /// // Basic usage
-/// let config = AppPath::new("settings.toml")?;
-/// let data_dir = AppPath::new("data")?;
+/// let config = AppPath::try_new("settings.toml")?;
+/// let data_dir = AppPath::try_new("data")?;
 ///
 /// // Check if files exist
 /// if config.exists() {
@@ -71,12 +83,12 @@ impl AppPath {
     /// ```rust
     /// use app_path::AppPath;
     ///
-    /// let config = AppPath::new("config.toml")?;
-    /// let nested = AppPath::new("data/users.db")?;
+    /// let config = AppPath::try_new("config.toml")?;
+    /// let nested = AppPath::try_new("data/users.db")?;
     ///
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
-    pub fn new(path: impl AsRef<Path>) -> Result<Self, std::io::Error> {
+    pub fn try_new(path: impl AsRef<Path>) -> Result<Self, std::io::Error> {
         let exe_dir = current_exe()?
             .parent()
             .ok_or_else(|| {
@@ -109,7 +121,7 @@ impl AppPath {
     /// use app_path::AppPath;
     /// use std::env;
     ///
-    /// let config = AppPath::new("config.toml")?
+    /// let config = AppPath::try_new("config.toml")?
     ///     .with_base(env::temp_dir());
     ///
     /// # Ok::<(), Box<dyn std::error::Error>>(())
@@ -121,7 +133,7 @@ impl AppPath {
 
     /// Get the original input path (before resolution).
     ///
-    /// Returns the path as it was originally provided to [`AppPath::new`],
+    /// Returns the path as it was originally provided to [`AppPath::try_new`],
     /// before any resolution or joining with the base directory.
     ///
     /// # Examples
@@ -129,7 +141,7 @@ impl AppPath {
     /// ```rust
     /// use app_path::AppPath;
     ///
-    /// let app_path = AppPath::new("config/settings.toml")?;
+    /// let app_path = AppPath::try_new("config/settings.toml")?;
     /// assert_eq!(app_path.input().to_str(), Some("config/settings.toml"));
     ///
     /// # Ok::<(), Box<dyn std::error::Error>>(())
@@ -149,7 +161,7 @@ impl AppPath {
     /// ```rust
     /// use app_path::AppPath;
     ///
-    /// let config = AppPath::new("config.toml")?;
+    /// let config = AppPath::try_new("config.toml")?;
     ///
     /// // Get the path for use with standard library functions
     /// println!("Config path: {}", config.path().display());
@@ -171,7 +183,7 @@ impl AppPath {
     /// ```rust
     /// use app_path::AppPath;
     ///
-    /// let config = AppPath::new("config.toml")?;
+    /// let config = AppPath::try_new("config.toml")?;
     ///
     /// if config.exists() {
     ///     println!("Config file found!");
@@ -199,7 +211,7 @@ impl AppPath {
     ///
     /// // Use a temporary directory for the example
     /// let temp_dir = env::temp_dir().join("app_path_example");
-    /// let data_file = AppPath::new("data/users/profile.json")?
+    /// let data_file = AppPath::try_new("data/users/profile.json")?
     ///     .with_base(&temp_dir);
     ///
     /// // Ensure the "data/users" directory exists
@@ -237,6 +249,55 @@ impl AsRef<Path> for AppPath {
         self.full_path.as_ref()
     }
 }
+
+/// Ergonomic fallible conversion from string types.
+///
+/// These implementations allow you to create `AppPath` instances directly
+/// from strings, with proper error handling for the fallible operation.
+///
+/// # Examples
+///
+/// ```rust
+/// use app_path::AppPath;
+/// use std::convert::TryFrom;
+///
+/// // From &str
+/// let config = AppPath::try_from("config.toml")?;
+///
+/// // From String
+/// let data_file = "data/users.db".to_string();
+/// let data = AppPath::try_from(data_file)?;
+///
+/// // From &String
+/// let path_string = "logs/app.log".to_string();
+/// let logs = AppPath::try_from(&path_string)?;
+///
+/// # Ok::<(), Box<dyn std::error::Error>>(())
+/// ```
+impl TryFrom<&str> for AppPath {
+    type Error = std::io::Error;
+
+    fn try_from(path: &str) -> Result<Self, Self::Error> {
+        AppPath::try_new(path)
+    }
+}
+
+impl TryFrom<String> for AppPath {
+    type Error = std::io::Error;
+
+    fn try_from(path: String) -> Result<Self, Self::Error> {
+        AppPath::try_new(path)
+    }
+}
+
+impl TryFrom<&String> for AppPath {
+    type Error = std::io::Error;
+
+    fn try_from(path: &String) -> Result<Self, Self::Error> {
+        AppPath::try_new(path)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -258,7 +319,7 @@ mod tests {
     fn resolves_relative_path_to_exe_dir() {
         // Simulate a file relative to the executable
         let rel = "myconfig.toml";
-        let rel_path = AppPath::new(rel).unwrap();
+        let rel_path = AppPath::try_new(rel).unwrap();
         let exe_dir = current_exe().unwrap().parent().unwrap().to_path_buf();
         let expected = exe_dir.join(rel);
 
@@ -274,7 +335,7 @@ mod tests {
         fs::create_dir_all(&temp_dir).unwrap();
 
         let rel = "subdir/file.txt";
-        let rel_path = AppPath::new(rel).unwrap().with_base(&temp_dir);
+        let rel_path = AppPath::try_new(rel).unwrap().with_base(&temp_dir);
         let expected = temp_dir.join(rel);
 
         assert_eq!(rel_path.path(), &expected);
@@ -291,7 +352,7 @@ mod tests {
         fs::create_dir_all(&temp_dir).unwrap();
         create_test_file(&file_path);
 
-        let rel_path = AppPath::new(file_name).unwrap().with_base(&temp_dir);
+        let rel_path = AppPath::try_new(file_name).unwrap().with_base(&temp_dir);
         assert!(rel_path.exists());
         assert_eq!(rel_path.path(), &file_path);
     }
@@ -303,7 +364,7 @@ mod tests {
         fs::create_dir_all(&temp_dir).unwrap();
 
         let rel = "./foo/../bar.txt";
-        let rel_path = AppPath::new(rel).unwrap().with_base(&temp_dir);
+        let rel_path = AppPath::try_new(rel).unwrap().with_base(&temp_dir);
         let expected = temp_dir.join(rel);
 
         assert_eq!(rel_path.path(), &expected);
@@ -312,7 +373,7 @@ mod tests {
     #[test]
     fn as_ref_and_into_pathbuf_are_consistent() {
         let rel = "somefile.txt";
-        let rel_path = AppPath::new(rel).unwrap();
+        let rel_path = AppPath::try_new(rel).unwrap();
         let as_ref_path: &Path = rel_path.as_ref();
         let into_pathbuf: PathBuf = rel_path.clone().into();
         assert_eq!(as_ref_path, into_pathbuf.as_path());
@@ -321,7 +382,7 @@ mod tests {
     #[test]
     fn test_input_method() {
         let rel = "config/app.toml";
-        let rel_path = AppPath::new(rel).unwrap();
+        let rel_path = AppPath::try_new(rel).unwrap();
         assert_eq!(rel_path.input(), Path::new(rel));
     }
 
@@ -329,7 +390,7 @@ mod tests {
     fn test_path_method() {
         let rel = "data/file.txt";
         let temp_dir = env::temp_dir().join("app_path_test_full");
-        let rel_path = AppPath::new(rel).unwrap().with_base(&temp_dir);
+        let rel_path = AppPath::try_new(rel).unwrap().with_base(&temp_dir);
         assert_eq!(rel_path.path(), temp_dir.join(rel));
     }
 
@@ -343,10 +404,10 @@ mod tests {
         let file_path = temp_dir.join(file_name);
         create_test_file(&file_path);
 
-        let rel_path = AppPath::new(file_name).unwrap().with_base(&temp_dir);
+        let rel_path = AppPath::try_new(file_name).unwrap().with_base(&temp_dir);
         assert!(rel_path.exists());
 
-        let non_existent = AppPath::new("non_existent.txt")
+        let non_existent = AppPath::try_new("non_existent.txt")
             .unwrap()
             .with_base(&temp_dir);
         assert!(!non_existent.exists());
@@ -358,7 +419,7 @@ mod tests {
         let _ = fs::remove_dir_all(&temp_dir);
 
         let rel = "deep/nested/dir/file.txt";
-        let rel_path = AppPath::new(rel).unwrap().with_base(&temp_dir);
+        let rel_path = AppPath::try_new(rel).unwrap().with_base(&temp_dir);
 
         rel_path.create_dir_all().unwrap();
         assert!(rel_path.path().parent().unwrap().exists());
@@ -368,9 +429,47 @@ mod tests {
     fn test_display_trait() {
         let rel = "display_test.txt";
         let temp_dir = env::temp_dir().join("app_path_test_display");
-        let rel_path = AppPath::new(rel).unwrap().with_base(&temp_dir);
+        let rel_path = AppPath::try_new(rel).unwrap().with_base(&temp_dir);
 
         let expected = temp_dir.join(rel);
         assert_eq!(format!("{rel_path}"), format!("{}", expected.display()));
+    }
+
+    #[test]
+    fn test_try_from_str() {
+        use std::convert::TryFrom;
+
+        let rel_path = AppPath::try_from("config.toml").unwrap();
+        let exe_dir = current_exe().unwrap().parent().unwrap().to_path_buf();
+        let expected = exe_dir.join("config.toml");
+
+        assert_eq!(rel_path.path(), &expected);
+        assert_eq!(rel_path.input(), Path::new("config.toml"));
+    }
+
+    #[test]
+    fn test_try_from_string() {
+        use std::convert::TryFrom;
+
+        let path_string = "data/file.txt".to_string();
+        let rel_path = AppPath::try_from(path_string).unwrap();
+        let exe_dir = current_exe().unwrap().parent().unwrap().to_path_buf();
+        let expected = exe_dir.join("data/file.txt");
+
+        assert_eq!(rel_path.path(), &expected);
+        assert_eq!(rel_path.input(), Path::new("data/file.txt"));
+    }
+
+    #[test]
+    fn test_try_from_string_ref() {
+        use std::convert::TryFrom;
+
+        let path_string = "logs/app.log".to_string();
+        let rel_path = AppPath::try_from(&path_string).unwrap();
+        let exe_dir = current_exe().unwrap().parent().unwrap().to_path_buf();
+        let expected = exe_dir.join("logs/app.log");
+
+        assert_eq!(rel_path.path(), &expected);
+        assert_eq!(rel_path.input(), Path::new("logs/app.log"));
     }
 }

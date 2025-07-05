@@ -27,9 +27,9 @@ When building applications that need to access files (configs, templates, data),
 use app_path::AppPath;
 
 // These paths are automatically relative to your executable
-let config = AppPath::new("config.toml")?;
-let templates = AppPath::new("templates")?;
-let data = AppPath::new("data/users.db")?;
+let config = AppPath::try_new("config.toml")?;
+let templates = AppPath::try_new("templates")?;
+let data = AppPath::try_new("data/users.db")?;
 
 // Check if files exist, create directories, etc.
 if !config.exists() {
@@ -46,7 +46,7 @@ if !config.exists() {
 let config = std::env::current_dir()?.join("config.toml");
 
 // ✅ Reliable - always relative to your executable
-let config = AppPath::new("config.toml")?;
+let config = AppPath::try_new("config.toml")?;
 ```
 
 ### vs. System Directories (`directories` crate)
@@ -57,7 +57,7 @@ let proj_dirs = ProjectDirs::from("com", "MyOrg", "MyApp").unwrap();
 let config = proj_dirs.config_dir().join("config.toml"); // ~/.config/MyApp/config.toml
 
 // ✅ Everything together with your app
-let config = AppPath::new("config.toml")?; // ./config.toml (next to exe)
+let config = AppPath::try_new("config.toml")?; // ./config.toml (next to exe)
 ```
 
 ### vs. Manual Path Joining
@@ -68,7 +68,7 @@ let exe_dir = exe_path.parent().ok_or("No parent")?;
 let config = exe_dir.join("config.toml");
 
 // ✅ Clean and simple
-let config = AppPath::new("config.toml")?;
+let config = AppPath::try_new("config.toml")?;
 ```
 
 ## 📁 Perfect For
@@ -84,8 +84,9 @@ let config = AppPath::new("config.toml")?;
 
 - ✅ **Zero dependencies** - Lightweight and fast
 - ✅ **Cross-platform** - Works on Windows, Linux, macOS
-- ✅ **Simple API** - Just `AppPath::new()` and you're done
+- ✅ **Simple API** - Just `AppPath::try_new()` and you're done
 - ✅ **Full `Path` compatibility** - Implements `AsRef<Path>`, `Display`, etc.
+- ✅ **Ergonomic conversions** - `TryFrom<&str>`, `TryFrom<String>` support
 - ✅ **Testing support** - Override base directory with `with_base()`
 - ✅ **Directory creation** - Built-in `create_dir_all()`
 - ✅ **Well tested** - Comprehensive test suite
@@ -104,9 +105,9 @@ use std::fs;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Create paths relative to your executable
-    let config = AppPath::new("config.toml")?;
-    let templates = AppPath::new("templates")?;
-    let logs = AppPath::new("logs/app.log")?;
+    let config = AppPath::try_new("config.toml")?;
+    let templates = AppPath::try_new("templates")?;
+    let logs = AppPath::try_new("logs/app.log")?;
     
     // Use them like normal paths
     if config.exists() {
@@ -125,18 +126,44 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 ```
 
+### Alternative Creation Methods
+
+For ergonomic conversions from strings, use `TryFrom`:
+
+```rust
+use app_path::AppPath;
+use std::convert::TryFrom;
+
+// Primary constructor - clear that it can fail
+let config = AppPath::try_new("config.toml")?;
+
+// From string literals using TryFrom
+let data = AppPath::try_from("data.db")?;
+
+// From String values
+let filename = "cache.json".to_string();
+let cache = AppPath::try_from(filename)?;
+
+// From String references  
+let path_string = "logs/app.log".to_string();
+let logs = AppPath::try_from(&path_string)?;
+
+// All methods give you the same functionality
+assert_eq!(config.input(), std::path::Path::new("config.toml"));
+```
+
 ## 🏗️ Application Structure
 
 Your portable application structure becomes:
 ```
 myapp.exe          # Your executable
-├── config.toml    # AppPath::new("config.toml")
-├── templates/     # AppPath::new("templates")
+├── config.toml    # AppPath::try_new("config.toml")
+├── templates/     # AppPath::try_new("templates")
 │   ├── email.html
 │   └── report.html
-├── data/          # AppPath::new("data")
+├── data/          # AppPath::try_new("data")
 │   └── cache.db
-└── logs/          # AppPath::new("logs")
+└── logs/          # AppPath::try_new("logs")
     └── app.log
 ```
 
@@ -153,7 +180,7 @@ mod tests {
     #[test]
     fn test_config_loading() {
         let temp = env::temp_dir().join("app_path_test");
-        let config = AppPath::new("config.toml")
+        let config = AppPath::try_new("config.toml")
             .unwrap()
             .with_base(&temp);
         
@@ -163,26 +190,26 @@ mod tests {
 }
 ```
 
-## 🔄 Migration Guide
+## 🔄 Common Usage Patterns
 
-### From hardcoded paths:
+### Replace hardcoded paths:
 ```rust
-// Before
-let config = PathBuf::from("config.toml");
+// Instead of brittle hardcoded paths
+let config = PathBuf::from("config.toml");  // Depends on working directory
 
-// After  
-let config = AppPath::new("config.toml")?;
+// Use AppPath for reliable, portable paths
+let config = AppPath::try_new("config.toml")?;  // Always relative to executable
 ```
 
-### From current_exe() manual handling:
+### Replace manual path construction:
 ```rust
-// Before
+// Instead of verbose manual construction
 let exe = std::env::current_exe()?;
 let exe_dir = exe.parent().unwrap();
 let config = exe_dir.join("config.toml");
 
-// After
-let config = AppPath::new("config.toml")?;
+// Use AppPath for clean, simple code
+let config = AppPath::try_new("config.toml")?;
 ```
 
 ## 📄 License
