@@ -1,15 +1,6 @@
 # Contributing to app-path
 
 Thanks for your interest in contributing! 🦀
-
-## Quick Start
-
-```bash
-git clone https://github.com/YOUR_USERNAME/app-path-rs.git
-cd app-path-rs
-cargo test
-```
-
 ## How to Contribute
 
 - **🐛 Bug reports**: [Open an issue](https://github.com/DK26/app-path-rs/issues) with reproduction steps
