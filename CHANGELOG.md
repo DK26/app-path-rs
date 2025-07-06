@@ -7,6 +7,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.2] - 2025-07-06
+
+### Added
+- Comprehensive documentation improvements across all files
+- Generic `impl Into<PathBuf>` parameter for `try_new()` supporting any path-like type
+- Smart path resolution behavior: relative paths resolve to executable directory, absolute paths used as-is
+- Ownership transfer optimization for `String` and `PathBuf` types
+- Enhanced examples showing different path types and ownership patterns
+- Path behavior documentation explaining absolute vs relative path handling
+
+### Enhanced
+- README.md with complete feature overview, path behavior section, and ownership examples
+- Crate-level documentation with absolute path examples and system integration use cases
+- API documentation with detailed behavior explanations for different path types
+- Test coverage for absolute path behavior and ownership transfer scenarios
+
+### Performance
+- Optimized ownership transfer when moving `String` or `PathBuf` into `AppPath`
+- Zero-copy path handling where possible through generic `impl Into<PathBuf>` parameter
+
+### Documentation
+- Added comprehensive path resolution behavior documentation
+- Enhanced examples showing portable vs system integration use cases
+- Complete API coverage with ownership and conversion examples
+- Improved testing guidelines and cross-platform compatibility notes
+
 ## [0.1.1] - 2025-07-05
 
 ### Added
@@ -37,6 +63,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added  
 - Initial release (yanked - replaced by 0.1.1 with improved API)
 
-[Unreleased]: https://github.com/DK26/app-path-rs/compare/v0.1.1...HEAD
+[Unreleased]: https://github.com/DK26/app-path-rs/compare/v0.1.2...HEAD
+[0.1.2]: https://github.com/DK26/app-path-rs/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/DK26/app-path-rs/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/DK26/app-path-rs/releases/tag/v0.1.0
