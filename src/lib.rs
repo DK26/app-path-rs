@@ -7,15 +7,28 @@
 //! ```rust
 //! use app_path::AppPath;
 //! use std::convert::TryFrom;
+//! use std::path::PathBuf;
 //!
-//! // Create paths relative to your executable
+//! // Create paths relative to your executable - accepts any path-like type
 //! let config = AppPath::try_new("config.toml")?;
 //! let data = AppPath::try_new("data/users.db")?;
 //!
-//! // Alternative: Use TryFrom for ergonomic conversions
-//! let logs = AppPath::try_from("logs/app.log")?;
-//! let cache_file = "cache.json".to_string();
-//! let cache = AppPath::try_from(cache_file)?;
+//! // Efficient ownership transfer for owned types
+//! let log_file = "logs/app.log".to_string();
+//! let logs = AppPath::try_new(log_file)?; // String is moved
+//!
+//! let path_buf = PathBuf::from("cache/data.bin");
+//! let cache = AppPath::try_new(path_buf)?; // PathBuf is moved
+//!
+//! // Works with any path-like type
+//! let from_path = AppPath::try_new(std::path::Path::new("temp.txt"))?;
+//!
+//! // Alternative: Use TryFrom for string types
+//! let settings = AppPath::try_from("settings.json")?;
+//!
+//! // Absolute paths are used as-is (for system integration)
+//! let system_log = AppPath::try_new("/var/log/app.log")?;
+//! let windows_temp = AppPath::try_new(r"C:\temp\cache.dat")?;
 //!
 //! // Get the paths for use with standard library functions
 //! println!("Config: {}", config.path().display());
@@ -28,6 +41,25 @@
 //!
 //! # Ok::<(), Box<dyn std::error::Error>>(())
 //! ```
+//!
+//! ## Path Resolution Behavior
+//!
+//! `AppPath` intelligently handles different path types:
+//!
+//! - **Relative paths** (e.g., `"config.toml"`, `"data/file.txt"`) are resolved
+//!   relative to the executable's directory
+//! - **Absolute paths** (e.g., `"/etc/config"`, `"C:\\temp\\file.txt"`) are used
+//!   as-is, ignoring the executable's directory
+//!
+//! This design enables both portable applications and system integration.
+//!
+//! ## Performance
+//!
+//! AppPath is optimized for efficient ownership transfer:
+//!
+//! - **String and PathBuf**: Moved into AppPath (no cloning)
+//! - **Generic types**: Uses `impl Into<PathBuf>` for zero-copy where possible
+//! - **References**: Efficient conversion without unnecessary allocations
 
 use std::env::current_exe;
 use std::path::{Path, PathBuf};
@@ -69,26 +101,47 @@ pub struct AppPath {
 impl AppPath {
     /// Creates file paths relative to the executable location.
     ///
+    /// This method accepts any type that can be converted into a `PathBuf`,
+    /// allowing for efficient ownership transfer when possible.
+    ///
+    /// **Behavior with different path types:**
+    /// - **Relative paths** (e.g., `"config.toml"`, `"data/file.txt"`) are resolved
+    ///   relative to the executable's directory
+    /// - **Absolute paths** (e.g., `"/etc/config"`, `"C:\\temp\\file.txt"`) are used
+    ///   as-is, ignoring the executable's directory
+    ///
     /// # Arguments
     ///
-    /// * `path` - A relative path that will be resolved relative to the executable
-    ///
-    /// # Returns
-    ///
-    /// Returns `Ok(AppPath)` on success, or an `std::io::Error` if the executable
-    /// directory cannot be determined.
+    /// * `path` - A path that will be resolved relative to the executable.
+    ///   Can be `&str`, `String`, `&Path`, `PathBuf`, etc.
     ///
     /// # Examples
     ///
     /// ```rust
     /// use app_path::AppPath;
+    /// use std::path::PathBuf;
     ///
+    /// // Relative paths are resolved relative to the executable
     /// let config = AppPath::try_new("config.toml")?;
-    /// let nested = AppPath::try_new("data/users.db")?;
+    /// let data = AppPath::try_new("data/users.db")?;
+    ///
+    /// // Absolute paths are used as-is (portable apps usually want relative paths)
+    /// let system_config = AppPath::try_new("/etc/app/config.toml")?;
+    /// let temp_file = AppPath::try_new(r"C:\temp\cache.dat")?;
+    ///
+    /// // From String (moves ownership)
+    /// let filename = "logs/app.log".to_string();
+    /// let logs = AppPath::try_new(filename)?; // filename is moved
+    ///
+    /// // From PathBuf (moves ownership)
+    /// let path_buf = PathBuf::from("cache/data.bin");
+    /// let cache = AppPath::try_new(path_buf)?; // path_buf is moved
     ///
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
-    pub fn try_new(path: impl AsRef<Path>) -> Result<Self, std::io::Error> {
+    pub fn try_new(path: impl Into<PathBuf>) -> Result<Self, std::io::Error> {
+        let input_path = path.into();
+
         let exe_dir = current_exe()?
             .parent()
             .ok_or_else(|| {
@@ -99,9 +152,11 @@ impl AppPath {
             })?
             .to_path_buf();
 
+        let full_path = exe_dir.join(&input_path);
+
         Ok(Self {
-            input_path: path.as_ref().to_path_buf(),
-            full_path: exe_dir.join(path),
+            input_path,
+            full_path,
         })
     }
 
@@ -254,23 +309,25 @@ impl AsRef<Path> for AppPath {
 ///
 /// These implementations allow you to create `AppPath` instances directly
 /// from strings, with proper error handling for the fallible operation.
+/// For other path types like `PathBuf`, use [`AppPath::try_new`] directly.
 ///
 /// # Examples
 ///
 /// ```rust
 /// use app_path::AppPath;
 /// use std::convert::TryFrom;
+/// use std::path::PathBuf;
 ///
 /// // From &str
 /// let config = AppPath::try_from("config.toml")?;
 ///
-/// // From String
+/// // From String (moves ownership)
 /// let data_file = "data/users.db".to_string();
 /// let data = AppPath::try_from(data_file)?;
 ///
-/// // From &String
-/// let path_string = "logs/app.log".to_string();
-/// let logs = AppPath::try_from(&path_string)?;
+/// // For PathBuf, use try_new directly (moves ownership)
+/// let path_buf = PathBuf::from("logs/app.log");
+/// let logs = AppPath::try_new(path_buf)?;
 ///
 /// # Ok::<(), Box<dyn std::error::Error>>(())
 /// ```
@@ -471,5 +528,102 @@ mod tests {
 
         assert_eq!(rel_path.path(), &expected);
         assert_eq!(rel_path.input(), Path::new("logs/app.log"));
+    }
+
+    #[test]
+    fn test_try_new_with_different_types() {
+        use std::path::PathBuf;
+
+        // Test various input types with try_new
+        let from_str = AppPath::try_new("test.txt").unwrap();
+        let from_string = AppPath::try_new("test.txt".to_string()).unwrap();
+        let from_path_buf = AppPath::try_new(PathBuf::from("test.txt")).unwrap();
+        let from_path_ref = AppPath::try_new(Path::new("test.txt")).unwrap();
+
+        // All should produce equivalent results
+        assert_eq!(from_str.input(), from_string.input());
+        assert_eq!(from_string.input(), from_path_buf.input());
+        assert_eq!(from_path_buf.input(), from_path_ref.input());
+        assert_eq!(from_str.input(), Path::new("test.txt"));
+    }
+
+    #[test]
+    fn test_ownership_transfer() {
+        use std::path::PathBuf;
+
+        let path_buf = PathBuf::from("test.txt");
+        let app_path = AppPath::try_new(path_buf).unwrap();
+        // path_buf is moved and no longer accessible
+
+        assert_eq!(app_path.input(), Path::new("test.txt"));
+
+        // Test with String too
+        let string_path = "another_test.txt".to_string();
+        let app_path2 = AppPath::try_new(string_path).unwrap();
+        // string_path is moved and no longer accessible
+
+        assert_eq!(app_path2.input(), Path::new("another_test.txt"));
+    }
+
+    #[test]
+    fn test_absolute_path_behavior() {
+        // Test what happens with an absolute path
+        let absolute_path = if cfg!(windows) {
+            r"C:\temp\config.toml"
+        } else {
+            "/tmp/config.toml"
+        };
+
+        let app_path = AppPath::try_new(absolute_path).unwrap();
+
+        // PathBuf::join() has special behavior: when joining with an absolute path,
+        // the absolute path replaces the base path entirely
+        // So AppPath correctly handles absolute paths by using them as-is
+        assert_eq!(app_path.path(), Path::new(absolute_path));
+        assert_eq!(app_path.input(), Path::new(absolute_path));
+
+        println!("Input: {absolute_path}");
+        println!("Result: {}", app_path.path().display());
+
+        // Verify it's still an absolute path
+        assert!(app_path.path().is_absolute());
+    }
+
+    #[test]
+    fn test_pathbuf_join_behavior_with_absolute_paths() {
+        use std::path::PathBuf;
+
+        // Let's understand how PathBuf::join works with absolute paths
+        let base = PathBuf::from("/home/user");
+        let absolute = PathBuf::from("/etc/config.toml");
+        let relative = PathBuf::from("config.toml");
+
+        println!("Base: {}", base.display());
+        println!("Relative join: {}", base.join(&relative).display());
+        println!("Absolute join: {}", base.join(&absolute).display());
+
+        // PathBuf::join has special behavior for absolute paths:
+        // If the right-hand side is absolute, it replaces the left-hand side
+        assert_eq!(
+            base.join(&relative),
+            PathBuf::from("/home/user/config.toml")
+        );
+        assert_eq!(base.join(&absolute), PathBuf::from("/etc/config.toml"));
+
+        // Same on Windows
+        if cfg!(windows) {
+            let win_base = PathBuf::from(r"C:\Users\User");
+            let win_absolute = PathBuf::from(r"D:\temp\file.txt");
+            let win_relative = PathBuf::from("file.txt");
+
+            assert_eq!(
+                win_base.join(&win_relative),
+                PathBuf::from(r"C:\Users\User\file.txt")
+            );
+            assert_eq!(
+                win_base.join(&win_absolute),
+                PathBuf::from(r"D:\temp\file.txt")
+            );
+        }
     }
 }
