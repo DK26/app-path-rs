@@ -582,7 +582,7 @@ mod tests {
         assert_eq!(app_path.path(), Path::new(absolute_path));
         assert_eq!(app_path.input(), Path::new(absolute_path));
 
-        println!("Input: {}", absolute_path);
+        println!("Input: {absolute_path}");
         println!("Result: {}", app_path.path().display());
 
         // Verify it's still an absolute path
@@ -611,17 +611,19 @@ mod tests {
         assert_eq!(base.join(&absolute), PathBuf::from("/etc/config.toml"));
 
         // Same on Windows
-        let win_base = PathBuf::from(r"C:\Users\User");
-        let win_absolute = PathBuf::from(r"D:\temp\file.txt");
-        let win_relative = PathBuf::from("file.txt");
+        if cfg!(windows) {
+            let win_base = PathBuf::from(r"C:\Users\User");
+            let win_absolute = PathBuf::from(r"D:\temp\file.txt");
+            let win_relative = PathBuf::from("file.txt");
 
-        assert_eq!(
-            win_base.join(&win_relative),
-            PathBuf::from(r"C:\Users\User\file.txt")
-        );
-        assert_eq!(
-            win_base.join(&win_absolute),
-            PathBuf::from(r"D:\temp\file.txt")
-        );
+            assert_eq!(
+                win_base.join(&win_relative),
+                PathBuf::from(r"C:\Users\User\file.txt")
+            );
+            assert_eq!(
+                win_base.join(&win_absolute),
+                PathBuf::from(r"D:\temp\file.txt")
+            );
+        }
     }
 }
