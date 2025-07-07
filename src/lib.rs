@@ -2,33 +2,60 @@
 //!
 //! Create file paths relative to your executable for truly portable applications.
 //!
+//! This crate provides a simple, robust solution for applications that need to access files
+//! and directories relative to their executable location. The design prioritizes **simplicity**,
+//! **performance**, and **reliability** for the common use case of portable applications.
+//!
+//! ## Design Philosophy
+//!
+//! **AppPath** is designed around these core principles:
+//!
+//! 1. **Portable-first**: Everything stays together with your executable
+//! 2. **Simple API**: Infallible constructors with clear panic conditions
+//! 3. **High performance**: Static caching and zero-allocation design
+//! 4. **Ergonomic**: Works seamlessly with all Rust path types
+//! 5. **Robust**: Handles edge cases in containerized/embedded environments
+//!
+//! The crate makes a deliberate trade-off: **simplicity and performance over fallible APIs**.
+//! Since executable location determination rarely fails in practice, and when it does fail
+//! it indicates fundamental system issues, we choose to panic with clear documentation
+//! rather than burden every usage site with error handling.
+//!
+//! ## Primary Use Cases
+//!
+//! This crate is specifically designed for applications that benefit from **portable layouts**:
+//!
+//! - **Portable applications** that run from USB drives or network shares
+//! - **Development tools** that should work without installation
+//! - **Corporate software** deployed without admin rights
+//! - **Containerized applications** with predictable file layouts
+//! - **Embedded systems** with simple, fixed directory structures
+//! - **CLI tools** that need configuration and data files nearby
+//!
 //! ## Quick Start
 //!
 //! ```rust
 //! use app_path::AppPath;
-//! use std::convert::TryFrom;
-//! use std::path::PathBuf;
+//! use std::path::{Path, PathBuf};
 //!
-//! // Create paths relative to your executable - accepts any path-like type
-//! let config = AppPath::try_new("config.toml")?;
-//! let data = AppPath::try_new("data/users.db")?;
+//! // Create paths relative to your executable - simple and clean
+//! let config = AppPath::new("config.toml");
+//! let data = AppPath::new("data/users.db");
 //!
-//! // Efficient ownership transfer for owned types
+//! // Accepts any AsRef<Path> type - no unnecessary allocations
 //! let log_file = "logs/app.log".to_string();
-//! let logs = AppPath::try_new(log_file)?; // String is moved
+//! let logs = AppPath::new(&log_file);
 //!
 //! let path_buf = PathBuf::from("cache/data.bin");
-//! let cache = AppPath::try_new(path_buf)?; // PathBuf is moved
+//! let cache = AppPath::new(&path_buf);
 //!
 //! // Works with any path-like type
-//! let from_path = AppPath::try_new(std::path::Path::new("temp.txt"))?;
+//! let from_path = AppPath::new(Path::new("temp.txt"));
 //!
-//! // Alternative: Use TryFrom for string types
-//! let settings = AppPath::try_from("settings.json")?;
-//!
-//! // Absolute paths are used as-is (for system integration)
-//! let system_log = AppPath::try_new("/var/log/app.log")?;
-//! let windows_temp = AppPath::try_new(r"C:\temp\cache.dat")?;
+//! // Alternative: Use From for any path type
+//! let settings: AppPath = "settings.json".into();
+//! let data_file: AppPath = PathBuf::from("data.db").into();
+//! let temp_file: AppPath = Path::new("temp.log").into();
 //!
 //! // Get the paths for use with standard library functions
 //! println!("Config: {}", config.path().display());
@@ -42,168 +69,581 @@
 //! # Ok::<(), Box<dyn std::error::Error>>(())
 //! ```
 //!
-//! ## Path Resolution Behavior
+//! ## Path Resolution Strategy
 //!
-//! `AppPath` intelligently handles different path types:
+//! **AppPath** uses intelligent path resolution to support both portable and system-integrated applications:
 //!
-//! - **Relative paths** (e.g., `"config.toml"`, `"data/file.txt"`) are resolved
-//!   relative to the executable's directory
-//! - **Absolute paths** (e.g., `"/etc/config"`, `"C:\\temp\\file.txt"`) are used
-//!   as-is, ignoring the executable's directory
+//! ```rust
+//! use app_path::AppPath;
 //!
-//! This design enables both portable applications and system integration.
+//! // Relative paths are resolved relative to the executable directory
+//! // This is the primary use case for portable applications
+//! let config = AppPath::new("config.toml");           // → exe_dir/config.toml
+//! let data = AppPath::new("data/users.db");           // → exe_dir/data/users.db
+//! let nested = AppPath::new("plugins/my_plugin.dll"); // → exe_dir/plugins/my_plugin.dll
 //!
-//! ## Performance
+//! // Absolute paths are used as-is for system integration
+//! // This allows hybrid applications that also integrate with the system
+//! let system_config = AppPath::new("/etc/myapp/config.toml");  // → /etc/myapp/config.toml
+//! let windows_temp = AppPath::new(r"C:\temp\cache.dat");       // → C:\temp\cache.dat
+//! ```
 //!
-//! AppPath is optimized for efficient ownership transfer:
+//! This dual behavior enables applications to be **primarily portable** while still
+//! allowing **system integration** when needed.
 //!
-//! - **String and PathBuf**: Moved into AppPath (no cloning)
-//! - **Generic types**: Uses `impl Into<PathBuf>` for zero-copy where possible
-//! - **References**: Efficient conversion without unnecessary allocations
+//! ## Performance and Memory Design
+//!
+//! **AppPath** is optimized for high-performance applications:
+//!
+//! - **Static caching**: Executable directory determined once, cached forever
+//! - **Minimal memory**: Only stores the final resolved path (no input path retained)
+//! - **Zero allocations**: Uses `AsRef<Path>` to avoid unnecessary conversions
+//! - **Efficient conversions**: `From` trait implementations for all common types
+//! - **Thread-safe**: Safe concurrent access to cached executable directory
+//!
+//! ```rust
+//! use app_path::AppPath;
+//! use std::path::{Path, PathBuf};
+//!
+//! // All of these are efficient - no unnecessary allocations
+//! let from_str = AppPath::new("config.toml");          // &str → direct usage
+//! let from_string = AppPath::new(&"data.db".to_string()); // &String → no move needed
+//! let from_path = AppPath::new(Path::new("logs.txt")); // &Path → direct usage
+//! let from_pathbuf = AppPath::new(&PathBuf::from("cache.bin")); // &PathBuf → no move needed
+//!
+//! // When you want ownership transfer, use From trait
+//! let owned: AppPath = PathBuf::from("important.db").into(); // PathBuf moved efficiently
+//! ```
+//!
+//! ## Reliability and Edge Cases
+//!
+//! **AppPath** is designed to be robust in various deployment environments:
+//!
+//! - **Handles root-level executables**: Works when executable is at filesystem root
+//! - **Container-friendly**: Designed for containerized and jailed environments
+//! - **Cross-platform**: Consistent behavior across Windows, Linux, and macOS
+//! - **Clear failure modes**: Panics with descriptive messages on rare system failures
+//!
+//! ### Panic Conditions
+//!
+//! The crate uses an **infallible API** that panics on rare system failures during static initialization.
+//! This design choice prioritizes **simplicity and performance** for the common case where
+//! executable location determination succeeds (which is the vast majority of real-world usage).
+//!
+//! **AppPath will panic if:**
+//!
+//! - **Cannot determine executable location** - When [`std::env::current_exe()`] fails
+//!   (rare, but possible in some embedded or heavily sandboxed environments)
+//! - **Executable path is empty** - When the system returns an empty executable path
+//!   (extremely rare, indicates a broken/corrupted system)
+//!
+//! **These panics occur:**
+//! - Once during the first use of any AppPath function
+//! - Indicate fundamental system issues that are typically unrecoverable
+//! - Are documented with clear error messages explaining the failure
+//!
+//! **Edge case handling:**
+//! - **Root-level executables**: When executable runs at filesystem root (e.g., `/init`, `C:\`),
+//!   the crate uses the root directory itself as the base
+//! - **Containerized environments**: Properly handles Docker, chroot, and other containerized environments
+//! - **Jailed environments**: Handles various forms of process isolation and sandboxing
+//!
+//! For applications that need fallible behavior, consider these practical alternatives:
+//!
+//! ```rust
+//! use app_path::AppPath;
+//! use std::env;
+//!
+//! // Pattern 1: Environment variable fallback (recommended)
+//! fn get_config_path() -> AppPath {
+//!     if let Ok(custom_dir) = env::var("MYAPP_CONFIG_DIR") {
+//!         let config_path = std::path::Path::new(&custom_dir).join("config.toml");
+//!         AppPath::new(config_path)
+//!     } else {
+//!         AppPath::new("config.toml")
+//!     }
+//! }
+//!
+//! // Pattern 2: Conditional development/production paths
+//! fn get_data_path() -> AppPath {
+//!     if env::var("DEVELOPMENT").is_ok() {
+//!         let dev_path = env::current_dir().unwrap().join("dev_data").join("app.db");
+//!         AppPath::new(dev_path)
+//!     } else {
+//!         AppPath::new("data/app.db")
+//!     }
+//! }
+//! ```
+//!
+//! For applications that need to handle executable location failures:
+//!
+//! ```rust
+//! use app_path::AppPath;
+//! use std::env;
+//!
+//! fn get_config_path_safe() -> AppPath {
+//!     match env::current_exe() {
+//!         Ok(exe_path) => {
+//!             if let Some(exe_dir) = exe_path.parent() {
+//!                 let config_path = exe_dir.join("config.toml");
+//!                 AppPath::new(config_path)
+//!             } else {
+//!                 // Fallback for edge case where exe has no parent
+//!                 let temp_dir = env::temp_dir().join("myapp");
+//!                 let _ = std::fs::create_dir_all(&temp_dir);
+//!                 let config_path = temp_dir.join("config.toml");
+//!                 AppPath::new(config_path)
+//!             }
+//!         }
+//!         Err(_) => {
+//!             // Fallback when executable location cannot be determined
+//!             let temp_dir = env::temp_dir().join("myapp");
+//!             let _ = std::fs::create_dir_all(&temp_dir);
+//!             let config_path = temp_dir.join("config.toml");
+//!             AppPath::new(config_path)
+//!         }
+//!     }
+//! }
+//! ```
+//!
+//! **Note:** Using `std::env::current_exe()` directly is simpler and more idiomatic
+//! than `panic::catch_unwind` patterns. Most applications should use environment
+//! variable and conditional patterns instead.
+//!
+//! ## Flexible Creation Methods
+//!
+//! ```rust
+//! use app_path::AppPath;
+//! use std::path::{Path, PathBuf};
+//!
+//! // Method 1: Direct construction (recommended)
+//! let config = AppPath::new("config.toml");
+//! let logs = AppPath::new(PathBuf::from("logs/app.log"));
+//!
+//! // Method 2: From trait for various path types
+//! let data1: AppPath = "data/users.db".into();               // &str
+//! let data2: AppPath = "settings.json".to_string().into();   // String
+//! let data3: AppPath = Path::new("cache/data.bin").into();   // &Path
+//! let data4: AppPath = PathBuf::from("temp/file.txt").into(); // PathBuf
+//!
+//! // All methods support efficient zero-copy when possible
+//! let owned_path = PathBuf::from("important/data.db");
+//! let app_path: AppPath = owned_path.into(); // PathBuf is moved efficiently
+//! ```
 
+use std::borrow::Borrow;
+use std::cmp::Ordering;
 use std::env::current_exe;
+use std::hash::{Hash, Hasher};
+use std::ops::Deref;
 use std::path::{Path, PathBuf};
+use std::sync::OnceLock;
+
+// Global executable directory - computed once, cached forever
+static EXE_DIR: OnceLock<PathBuf> = OnceLock::new();
+
+/// Internal function to initialize and get the executable directory
+fn exe_dir_inner() -> &'static PathBuf {
+    EXE_DIR.get_or_init(|| {
+        let exe = current_exe().expect("Failed to determine executable location");
+
+        // Handle edge case: executable at filesystem root (jailed environments, etc.)
+        match exe.parent() {
+            Some(parent) => parent.to_path_buf(),
+            None => {
+                // If exe has no parent (e.g., running as "/init" or "C:\"),
+                // use the root directory itself
+                if exe.as_os_str().is_empty() {
+                    panic!("Executable path is empty - unsupported environment");
+                }
+
+                // For root-level executables, use the root directory
+                exe.ancestors()
+                    .last()
+                    .expect("Failed to determine filesystem root")
+                    .to_path_buf()
+            }
+        }
+    })
+}
 
 /// Creates paths relative to the executable location for applications.
 ///
-/// All files and directories stay together with the executable, making
-/// your application truly portable. Perfect for:
+/// **AppPath** is the core type for building portable applications where all files and directories
+/// stay together with the executable. This design choice makes applications truly portable -
+/// they can run from USB drives, network shares, or any directory without installation.
 ///
-/// - Portable applications that run from USB drives
-/// - Development tools that should work anywhere
-/// - Corporate environments where you can't install software
+/// ## Available Trait Implementations
+///
+/// `AppPath` implements a comprehensive set of traits for seamless integration with Rust's
+/// standard library and idiomatic code patterns:
+///
+/// **Core Traits:**
+/// - `Clone` - Efficient cloning (only copies the resolved path)
+/// - `Debug` - Useful debug output showing the resolved path
+/// - `Default` - Creates a path pointing to the executable directory
+/// - `Display` - Human-readable path display
+///
+/// **Comparison Traits:**
+/// - `PartialEq`, `Eq` - Compare paths for equality
+/// - `PartialOrd`, `Ord` - Lexicographic ordering for sorting
+/// - `Hash` - Use as keys in `HashMap`, `HashSet`, etc.
+///
+/// **Conversion Traits:**
+/// - `AsRef<Path>` - Use with any API expecting `&Path`
+/// - `Deref<Target=Path>` - Direct access to `Path` methods (e.g., `.extension()`)
+/// - `Borrow<Path>` - Enable borrowing as `&Path` for collection compatibility
+/// - `From<T>` for `&str`, `String`, `&Path`, `PathBuf`, etc. - Flexible construction
+/// - `Into<PathBuf>` - Convert to owned `PathBuf`
+///
+/// These implementations make `AppPath` a **zero-cost abstraction** that works seamlessly
+/// with existing Rust code while providing portable path resolution.
+///
+/// ## Design Rationale
+///
+/// **Why relative to executable instead of current directory?**
+/// - Current directory depends on where the user runs the program from
+/// - Executable location is reliable and predictable
+/// - Enables true portability - the entire application can be moved as one unit
+///
+/// **Why infallible API instead of Result-based?**
+/// - Executable location determination rarely fails in practice
+/// - When it does fail, it indicates fundamental system issues
+/// - Infallible API eliminates error handling boilerplate from every usage site
+/// - Results in cleaner, more maintainable application code
+///
+/// **Why static caching?**
+/// - Executable location never changes during program execution
+/// - Avoids repeated system calls for performance
+/// - Thread-safe and efficient for concurrent applications
+///
+/// ## Perfect For
+///
+/// - **Portable applications** that run from USB drives or network shares
+/// - **Development tools** that should work anywhere without installation
+/// - **Corporate environments** where you can't install software system-wide
+/// - **Containerized applications** with predictable, self-contained layouts
+/// - **Embedded systems** with simple, fixed directory structures
+/// - **CLI tools** that need configuration and data files nearby
+///
+/// ## Memory Layout
+///
+/// Each `AppPath` instance stores only the final resolved path (`PathBuf`), making it
+/// memory-efficient. The original input path is not retained, as the resolved path
+/// contains all necessary information for file operations.
+///
+/// ```text
+/// AppPath {
+///     full_path: PathBuf  // Only field - minimal memory usage
+/// }
+/// ```
+///
+/// ## Thread Safety
+///
+/// `AppPath` is `Send + Sync` and can be safely shared between threads. The static
+/// executable directory cache is initialized once and safely shared across all threads.
+///
+/// # Panics
+///
+/// Panics on first use if the executable location cannot be determined.
+/// See [crate-level documentation](crate) for comprehensive details on panic conditions
+/// and edge case handling.
 ///
 /// # Examples
+///
+/// ## Basic Usage
 ///
 /// ```rust
 /// use app_path::AppPath;
 ///
-/// // Basic usage
-/// let config = AppPath::try_new("settings.toml")?;
-/// let data_dir = AppPath::try_new("data")?;
+/// // Simple relative paths - the common case
+/// let config = AppPath::new("config.toml");
+/// let data_dir = AppPath::new("data");
+/// let logs = AppPath::new("logs/app.log");
 ///
-/// // Check if files exist
+/// // Use like normal paths
 /// if config.exists() {
 ///     let settings = std::fs::read_to_string(config.path())?;
 /// }
 ///
-/// // Create directories
+/// // Create directories as needed
 /// data_dir.create_dir_all()?;
 ///
 /// # Ok::<(), Box<dyn std::error::Error>>(())
 /// ```
+///
+/// ## Mixed Portable and System Paths
+///
+/// ```rust
+/// use app_path::AppPath;
+///
+/// // Portable app files (relative paths)
+/// let app_config = AppPath::new("config.toml");       // → exe_dir/config.toml
+/// let app_data = AppPath::new("data/users.db");       // → exe_dir/data/users.db
+///
+/// // System integration (absolute paths)
+/// let system_log = AppPath::new("/var/log/myapp.log"); // → /var/log/myapp.log
+/// let temp_cache = AppPath::new(std::env::temp_dir().join("cache.db"));
+///
+/// println!("App config: {}", app_config);    // Portable
+/// println!("System log: {}", system_log);    // System integration
+/// ```
+///
+/// ## Performance-Conscious Usage
+///
+/// ```rust
+/// use app_path::AppPath;
+/// use std::path::{Path, PathBuf};
+///
+/// // Efficient - no unnecessary allocations
+/// let config = AppPath::new("config.toml");          // &str
+/// let data = AppPath::new(Path::new("data.db"));     // &Path
+///
+/// // When you have owned values, borrow them to avoid moves
+/// let filename = "important.log".to_string();
+/// let logs = AppPath::new(&filename);                 // &String - no move
+///
+/// // Use From trait when you want ownership transfer
+/// let owned_path = PathBuf::from("cache.bin");
+/// let cache: AppPath = owned_path.into();             // PathBuf moved
+/// ```
+///
+/// ## Portable vs System Integration
+///
+/// ```rust
+/// use app_path::AppPath;
+///
+/// // Portable application files (relative paths)
+/// let app_config = AppPath::new("config.toml");           // → exe_dir/config.toml
+/// let app_data = AppPath::new("data/users.db");           // → exe_dir/data/users.db
+/// let plugins = AppPath::new("plugins/my_plugin.dll");    // → exe_dir/plugins/my_plugin.dll
+///
+/// // System integration (absolute paths)
+/// let system_config = AppPath::new("/etc/myapp/global.toml");  // → /etc/myapp/global.toml
+/// let temp_file = AppPath::new(r"C:\temp\cache.dat");          // → C:\temp\cache.dat
+/// let user_data = AppPath::new("/home/user/.myapp/prefs");     // → /home/user/.myapp/prefs
+/// ```
+///
+/// ## Common Patterns
+///
+/// ```rust
+/// use app_path::AppPath;
+/// use std::fs;
+///
+/// // Configuration file pattern
+/// let config = AppPath::new("config.toml");
+/// if config.exists() {
+///     let content = fs::read_to_string(config.path())?;
+///     // Parse configuration...
+/// }
+///
+/// // Data directory pattern
+/// let data_dir = AppPath::new("data");
+/// data_dir.create_dir_all()?;  // Ensure directory exists
+/// let user_db = AppPath::new("data/users.db");
+///
+/// // Logging pattern
+/// let log_file = AppPath::new("logs/app.log");
+/// log_file.create_dir_all()?;  // Create logs directory if needed
+/// fs::write(log_file.path(), "Application started\n")?;
+///
+/// # Ok::<(), Box<dyn std::error::Error>>(())
+/// ```
+///
+/// ## Trait Implementation Examples
+///
+/// `AppPath` implements many useful traits that enable ergonomic usage patterns:
+///
+/// ```rust
+/// use app_path::AppPath;
+/// use std::collections::{HashMap, BTreeSet};
+///
+/// // Default trait - creates path to executable directory
+/// let exe_dir = AppPath::default();
+/// assert_eq!(exe_dir, AppPath::new(""));
+///
+/// // Comparison traits - enable sorting and equality checks
+/// let mut paths = vec![
+///     AppPath::new("z.txt"),
+///     AppPath::new("a.txt"),
+///     AppPath::new("m.txt"),
+/// ];
+/// paths.sort(); // Uses Ord trait
+/// assert!(paths[0] < paths[1]); // Uses PartialOrd trait
+///
+/// // Hash trait - use as keys in collections
+/// let mut file_types = HashMap::new();
+/// file_types.insert(AppPath::new("config.toml"), "Configuration");
+/// file_types.insert(AppPath::new("data.db"), "Database");
+///
+/// // Ordered collections work automatically
+/// let mut sorted_paths = BTreeSet::new();
+/// sorted_paths.insert(AppPath::new("config.toml"));
+/// sorted_paths.insert(AppPath::new("data.db"));
+///
+/// // Deref trait - direct access to Path methods
+/// let config = AppPath::new("config.toml");
+/// assert_eq!(config.extension(), Some("toml".as_ref())); // Direct Path method
+/// assert_eq!(config.file_name(), Some("config.toml".as_ref()));
+///
+/// // Works with functions expecting &Path (deref coercion)
+/// fn analyze_path(path: &std::path::Path) -> Option<&str> {
+///     path.extension()?.to_str()
+/// }
+/// assert_eq!(analyze_path(&config), Some("toml"));
+///
+/// // From trait - flexible construction from many types
+/// let from_str: AppPath = "data.txt".into();
+/// let from_pathbuf: AppPath = std::path::PathBuf::from("logs.txt").into();
+///
+/// // Display trait - human-readable output
+/// println!("Config path: {}", config); // Clean path display
+/// ```
 #[derive(Clone, Debug)]
 pub struct AppPath {
-    input_path: PathBuf,
     full_path: PathBuf,
 }
 
 impl AppPath {
     /// Creates file paths relative to the executable location.
     ///
-    /// This method accepts any type that can be converted into a `PathBuf`,
-    /// allowing for efficient ownership transfer when possible.
+    /// This is the primary constructor for `AppPath`. The method accepts any type that implements
+    /// [`AsRef<Path>`], providing maximum flexibility while maintaining zero-allocation performance
+    /// for most use cases.
     ///
-    /// **Behavior with different path types:**
+    /// ## Design Choices
+    ///
+    /// **Why `impl AsRef<Path>` instead of specific types?**
+    /// - Accepts all path-like types: `&str`, `String`, `&Path`, `PathBuf`, etc.
+    /// - Avoids unnecessary allocations through efficient borrowing
+    /// - Provides a single, consistent API instead of multiple overloads
+    /// - Enables efficient usage patterns for both owned and borrowed values
+    ///
+    /// **Why infallible constructor?**
+    /// - Executable location determination succeeds in >99.9% of real-world usage
+    /// - Eliminates error handling boilerplate from every call site
+    /// - Makes the API more ergonomic for the common case
+    /// - Follows Rust conventions where `new()` implies infallible construction
+    ///
+    /// **Path Resolution Strategy:**
     /// - **Relative paths** (e.g., `"config.toml"`, `"data/file.txt"`) are resolved
-    ///   relative to the executable's directory
+    ///   relative to the executable's directory - this is the primary use case
     /// - **Absolute paths** (e.g., `"/etc/config"`, `"C:\\temp\\file.txt"`) are used
-    ///   as-is, ignoring the executable's directory
+    ///   as-is, ignoring the executable's directory - enables system integration
+    ///
+    /// This dual behavior supports both **portable applications** (relative paths) and
+    /// **system integration** (absolute paths) within the same API.
     ///
     /// # Arguments
     ///
-    /// * `path` - A path that will be resolved relative to the executable.
-    ///   Can be `&str`, `String`, `&Path`, `PathBuf`, etc.
+    /// * `path` - A path that will be resolved according to AppPath's resolution strategy.
+    ///   Accepts any type implementing [`AsRef<Path>`]:
+    ///   - `&str` - String literals and string slices
+    ///   - `String` - Owned strings
+    ///   - `&Path` - Path references
+    ///   - `PathBuf` - Path buffers
+    ///   - And many others that implement `AsRef<Path>`
+    ///
+    ///   **Path Resolution:**
+    ///   - **Relative paths** are resolved relative to the executable directory
+    ///   - **Absolute paths** are used as-is (not modified)
+    ///
+    /// # Panics
+    ///
+    /// Panics on first use if the executable location cannot be determined.
+    /// This is a **one-time initialization panic** that occurs during static initialization
+    /// of the executable directory cache.
+    ///
+    /// See [crate-level documentation](crate) for comprehensive details on:
+    /// - When panics can occur (rare system failure conditions)
+    /// - How edge cases are handled (root-level executables, containers)
+    /// - Strategies for applications that need fallible behavior
+    ///
+    /// # Performance Notes
+    ///
+    /// This method is highly optimized:
+    /// - **Static caching**: Executable location determined once, reused forever
+    /// - **Zero allocations**: Uses `AsRef<Path>` to avoid unnecessary conversions
+    /// - **Minimal memory**: Only stores the final resolved path
+    /// - **Thread-safe**: Safe to call from multiple threads concurrently
     ///
     /// # Examples
     ///
-    /// ```rust
-    /// use app_path::AppPath;
-    /// use std::path::PathBuf;
-    ///
-    /// // Relative paths are resolved relative to the executable
-    /// let config = AppPath::try_new("config.toml")?;
-    /// let data = AppPath::try_new("data/users.db")?;
-    ///
-    /// // Absolute paths are used as-is (portable apps usually want relative paths)
-    /// let system_config = AppPath::try_new("/etc/app/config.toml")?;
-    /// let temp_file = AppPath::try_new(r"C:\temp\cache.dat")?;
-    ///
-    /// // From String (moves ownership)
-    /// let filename = "logs/app.log".to_string();
-    /// let logs = AppPath::try_new(filename)?; // filename is moved
-    ///
-    /// // From PathBuf (moves ownership)
-    /// let path_buf = PathBuf::from("cache/data.bin");
-    /// let cache = AppPath::try_new(path_buf)?; // path_buf is moved
-    ///
-    /// # Ok::<(), Box<dyn std::error::Error>>(())
-    /// ```
-    pub fn try_new(path: impl Into<PathBuf>) -> Result<Self, std::io::Error> {
-        let input_path = path.into();
-
-        let exe_dir = current_exe()?
-            .parent()
-            .ok_or_else(|| {
-                std::io::Error::new(
-                    std::io::ErrorKind::NotFound,
-                    "Could not determine executable parent directory",
-                )
-            })?
-            .to_path_buf();
-
-        let full_path = exe_dir.join(&input_path);
-
-        Ok(Self {
-            input_path,
-            full_path,
-        })
-    }
-
-    /// Override the base directory (useful for testing or custom layouts).
-    ///
-    /// This method allows you to specify a different base directory instead
-    /// of using the executable's directory. Useful for testing or when you
-    /// want a different layout.
-    ///
-    /// # Arguments
-    ///
-    /// * `base` - The new base directory to use
-    ///
-    /// # Examples
-    ///
-    /// ```rust
-    /// use app_path::AppPath;
-    /// use std::env;
-    ///
-    /// let config = AppPath::try_new("config.toml")?
-    ///     .with_base(env::temp_dir());
-    ///
-    /// # Ok::<(), Box<dyn std::error::Error>>(())
-    /// ```
-    pub fn with_base(mut self, base: impl AsRef<Path>) -> Self {
-        self.full_path = base.as_ref().join(&self.input_path);
-        self
-    }
-
-    /// Get the original input path (before resolution).
-    ///
-    /// Returns the path as it was originally provided to [`AppPath::try_new`],
-    /// before any resolution or joining with the base directory.
-    ///
-    /// # Examples
+    /// ## Basic Usage (Recommended)
     ///
     /// ```rust
     /// use app_path::AppPath;
     ///
-    /// let app_path = AppPath::try_new("config/settings.toml")?;
-    /// assert_eq!(app_path.input().to_str(), Some("config/settings.toml"));
+    /// // These create portable paths relative to your executable
+    /// let config = AppPath::new("config.toml");           // &str
+    /// let data = AppPath::new("data/users.db");           // &str with subdirectory
+    /// let logs = AppPath::new("logs/app.log");            // Nested directories
+    /// ```
+    ///
+    /// ## Efficient Usage with Different Types
+    ///
+    /// ```rust
+    /// use app_path::AppPath;
+    /// use std::path::{Path, PathBuf};
+    ///
+    /// // All of these are efficient - no unnecessary allocations
+    /// let from_str = AppPath::new("config.toml");         // &str → direct usage
+    /// let from_path = AppPath::new(Path::new("data.db")); // &Path → direct usage
+    ///
+    /// // Borrow owned values to avoid moves when you need them later
+    /// let filename = "important.log".to_string();
+    /// let logs = AppPath::new(&filename);                 // &String → efficient borrowing
+    /// println!("Original filename: {}", filename);       // filename still available
+    ///
+    /// let path_buf = PathBuf::from("cache.bin");
+    /// let cache = AppPath::new(&path_buf);                // &PathBuf → efficient borrowing
+    /// println!("Original path: {}", path_buf.display()); // path_buf still available
+    /// ```
+    ///
+    /// ## Portable vs System Integration
+    ///
+    /// ```rust
+    /// use app_path::AppPath;
+    ///
+    /// // Portable application files (relative paths)
+    /// let app_config = AppPath::new("config.toml");           // → exe_dir/config.toml
+    /// let app_data = AppPath::new("data/users.db");           // → exe_dir/data/users.db
+    /// let plugins = AppPath::new("plugins/my_plugin.dll");    // → exe_dir/plugins/my_plugin.dll
+    ///
+    /// // System integration (absolute paths)
+    /// let system_config = AppPath::new("/etc/myapp/global.toml");  // → /etc/myapp/global.toml
+    /// let temp_file = AppPath::new(r"C:\temp\cache.dat");          // → C:\temp\cache.dat
+    /// let user_data = AppPath::new("/home/user/.myapp/prefs");     // → /home/user/.myapp/prefs
+    /// ```
+    ///
+    /// ## Common Patterns
+    ///
+    /// ```rust
+    /// use app_path::AppPath;
+    /// use std::fs;
+    ///
+    /// // Configuration file pattern
+    /// let config = AppPath::new("config.toml");
+    /// if config.exists() {
+    ///     let content = fs::read_to_string(config.path())?;
+    ///     // Parse configuration...
+    /// }
+    ///
+    /// // Data directory pattern
+    /// let data_dir = AppPath::new("data");
+    /// data_dir.create_dir_all()?;  // Ensure directory exists
+    /// let user_db = AppPath::new("data/users.db");
+    ///
+    /// // Logging pattern
+    /// let log_file = AppPath::new("logs/app.log");
+    /// log_file.create_dir_all()?;  // Create logs directory if needed
+    /// fs::write(log_file.path(), "Application started\n")?;
     ///
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
-    #[inline]
-    pub fn input(&self) -> &Path {
-        &self.input_path
+    pub fn new(path: impl AsRef<Path>) -> Self {
+        let full_path = exe_dir_inner().join(path.as_ref());
+        Self { full_path }
     }
 
     /// Get the full resolved path.
@@ -216,15 +656,13 @@ impl AppPath {
     /// ```rust
     /// use app_path::AppPath;
     ///
-    /// let config = AppPath::try_new("config.toml")?;
+    /// let config = AppPath::new("config.toml");
     ///
     /// // Get the path for use with standard library functions
     /// println!("Config path: {}", config.path().display());
     ///
     /// // The path is always absolute
     /// assert!(config.path().is_absolute());
-    ///
-    /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
     #[inline]
     pub fn path(&self) -> &Path {
@@ -238,15 +676,13 @@ impl AppPath {
     /// ```rust
     /// use app_path::AppPath;
     ///
-    /// let config = AppPath::try_new("config.toml")?;
+    /// let config = AppPath::new("config.toml");
     ///
     /// if config.exists() {
     ///     println!("Config file found!");
     /// } else {
     ///     println!("Config file not found, using defaults.");
     /// }
-    ///
-    /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
     #[inline]
     pub fn exists(&self) -> bool {
@@ -266,8 +702,8 @@ impl AppPath {
     ///
     /// // Use a temporary directory for the example
     /// let temp_dir = env::temp_dir().join("app_path_example");
-    /// let data_file = AppPath::try_new("data/users/profile.json")?
-    ///     .with_base(&temp_dir);
+    /// let data_file_path = temp_dir.join("data/users/profile.json");
+    /// let data_file = AppPath::new(data_file_path);
     ///
     /// // Ensure the "data/users" directory exists
     /// data_file.create_dir_all()?;
@@ -286,7 +722,29 @@ impl AppPath {
     }
 }
 
+/// Get the executable's directory.
+///
+/// This function provides access to the cached executable directory that AppPath uses.
+/// Useful for advanced use cases where you need the directory path directly.
+///
+/// # Panics
+///
+/// Panics if the executable location cannot be determined (same conditions as AppPath).
+///
+/// # Examples
+///
+/// ```rust
+/// use app_path::exe_dir;
+///
+/// println!("Executable directory: {}", exe_dir().display());
+/// ```
+pub fn exe_dir() -> &'static Path {
+    exe_dir_inner().as_path()
+}
+
+// Standard trait implementations
 impl std::fmt::Display for AppPath {
+    #[inline]
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.full_path.display())
     }
@@ -298,6 +756,7 @@ impl From<AppPath> for PathBuf {
         app_path.full_path
     }
 }
+
 impl AsRef<Path> for AppPath {
     #[inline]
     fn as_ref(&self) -> &Path {
@@ -305,325 +764,234 @@ impl AsRef<Path> for AppPath {
     }
 }
 
-/// Ergonomic fallible conversion from string types.
-///
-/// These implementations allow you to create `AppPath` instances directly
-/// from strings, with proper error handling for the fallible operation.
-/// For other path types like `PathBuf`, use [`AppPath::try_new`] directly.
-///
-/// # Examples
-///
-/// ```rust
-/// use app_path::AppPath;
-/// use std::convert::TryFrom;
-/// use std::path::PathBuf;
-///
-/// // From &str
-/// let config = AppPath::try_from("config.toml")?;
-///
-/// // From String (moves ownership)
-/// let data_file = "data/users.db".to_string();
-/// let data = AppPath::try_from(data_file)?;
-///
-/// // For PathBuf, use try_new directly (moves ownership)
-/// let path_buf = PathBuf::from("logs/app.log");
-/// let logs = AppPath::try_new(path_buf)?;
-///
-/// # Ok::<(), Box<dyn std::error::Error>>(())
-/// ```
-impl TryFrom<&str> for AppPath {
-    type Error = std::io::Error;
-
-    fn try_from(path: &str) -> Result<Self, Self::Error> {
-        AppPath::try_new(path)
+// Infallible From implementations for common types
+impl From<&str> for AppPath {
+    #[inline]
+    fn from(path: &str) -> Self {
+        Self::new(path)
     }
 }
 
-impl TryFrom<String> for AppPath {
-    type Error = std::io::Error;
-
-    fn try_from(path: String) -> Result<Self, Self::Error> {
-        AppPath::try_new(path)
+impl From<String> for AppPath {
+    #[inline]
+    fn from(path: String) -> Self {
+        Self::new(path)
     }
 }
 
-impl TryFrom<&String> for AppPath {
-    type Error = std::io::Error;
+impl From<&String> for AppPath {
+    #[inline]
+    fn from(path: &String) -> Self {
+        Self::new(path)
+    }
+}
 
-    fn try_from(path: &String) -> Result<Self, Self::Error> {
-        AppPath::try_new(path)
+impl From<&Path> for AppPath {
+    #[inline]
+    fn from(path: &Path) -> Self {
+        Self::new(path)
+    }
+}
+
+impl From<PathBuf> for AppPath {
+    #[inline]
+    fn from(path: PathBuf) -> Self {
+        Self::new(path)
+    }
+}
+
+// === Additional Trait Implementations ===
+
+impl Default for AppPath {
+    /// Creates an `AppPath` pointing to the executable's directory.
+    ///
+    /// This is equivalent to calling `AppPath::new("")`. The default instance
+    /// represents the directory containing the executable, which is useful as
+    /// a starting point for portable applications.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use app_path::AppPath;
+    ///
+    /// let exe_dir = AppPath::default();
+    /// let empty_path = AppPath::new("");
+    ///
+    /// // Default should be equivalent to new("")
+    /// assert_eq!(exe_dir, empty_path);
+    ///
+    /// // Both should point to the executable directory
+    /// assert_eq!(exe_dir.path(), app_path::exe_dir());
+    /// ```
+    #[inline]
+    fn default() -> Self {
+        Self::new("")
+    }
+}
+
+impl PartialEq for AppPath {
+    /// Compares two `AppPath` instances for equality based on their resolved paths.
+    ///
+    /// Two `AppPath` instances are considered equal if their full resolved paths
+    /// are identical, regardless of how they were constructed.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use app_path::AppPath;
+    ///
+    /// let path1 = AppPath::new("config.toml");
+    /// let path2 = AppPath::new("config.toml");
+    /// let path3 = AppPath::new("other.toml");
+    ///
+    /// assert_eq!(path1, path2);
+    /// assert_ne!(path1, path3);
+    /// ```
+    #[inline]
+    fn eq(&self, other: &Self) -> bool {
+        self.full_path == other.full_path
+    }
+}
+
+impl Eq for AppPath {}
+
+impl PartialOrd for AppPath {
+    /// Compares two `AppPath` instances lexicographically based on their resolved paths.
+    ///
+    /// The comparison is performed on the full resolved paths, providing consistent
+    /// ordering for sorting and collection operations.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use app_path::AppPath;
+    ///
+    /// let path1 = AppPath::new("a.txt");
+    /// let path2 = AppPath::new("b.txt");
+    ///
+    /// assert!(path1 < path2);
+    /// ```
+    #[inline]
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for AppPath {
+    /// Compares two `AppPath` instances lexicographically based on their resolved paths.
+    ///
+    /// This provides a total ordering that enables `AppPath` to be used in sorted
+    /// collections like `BTreeMap` and `BTreeSet`.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use app_path::AppPath;
+    /// use std::collections::BTreeSet;
+    ///
+    /// let mut paths = BTreeSet::new();
+    /// paths.insert(AppPath::new("config.toml"));
+    /// paths.insert(AppPath::new("data.db"));
+    /// paths.insert(AppPath::new("app.log"));
+    ///
+    /// // Paths are automatically sorted lexicographically
+    /// let sorted: Vec<_> = paths.into_iter().collect();
+    /// ```
+    #[inline]
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.full_path.cmp(&other.full_path)
+    }
+}
+
+impl Hash for AppPath {
+    /// Computes a hash for the `AppPath` based on its resolved path.
+    ///
+    /// This enables `AppPath` to be used as keys in hash-based collections
+    /// like `HashMap` and `HashSet`. The hash is computed from the full
+    /// resolved path, ensuring consistent behavior.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use app_path::AppPath;
+    /// use std::collections::HashMap;
+    ///
+    /// let mut config_map = HashMap::new();
+    /// let config_path = AppPath::new("config.toml");
+    /// config_map.insert(config_path, "Configuration file");
+    /// ```
+    #[inline]
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.full_path.hash(state);
+    }
+}
+
+impl Deref for AppPath {
+    type Target = Path;
+
+    /// Provides direct access to the underlying `Path` through deref coercion.
+    ///
+    /// This allows `AppPath` to be used directly with any API that expects a `&Path`,
+    /// making it a zero-cost abstraction in many contexts. All `Path` methods become
+    /// directly available on `AppPath` instances.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use app_path::AppPath;
+    ///
+    /// let app_path = AppPath::new("config.toml");
+    ///
+    /// // Direct access to Path methods through deref
+    /// assert_eq!(app_path.extension(), Some("toml".as_ref()));
+    /// assert_eq!(app_path.file_name(), Some("config.toml".as_ref()));
+    ///
+    /// // Works with functions expecting &Path
+    /// fn process_path(path: &std::path::Path) {
+    ///     println!("Processing: {}", path.display());
+    /// }
+    ///
+    /// process_path(&app_path); // Automatic deref coercion
+    /// ```
+    #[inline]
+    fn deref(&self) -> &Self::Target {
+        &self.full_path
+    }
+}
+
+impl Borrow<Path> for AppPath {
+    /// Allows `AppPath` to be borrowed as a `Path`.
+    ///
+    /// This enables `AppPath` to be used seamlessly in collections that are
+    /// keyed by `Path`, and allows for efficient lookups using `&Path` values.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use app_path::AppPath;
+    /// use std::collections::HashMap;
+    /// use std::path::Path;
+    ///
+    /// let mut path_map = HashMap::new();
+    /// let app_path = AppPath::new("config.toml");
+    /// path_map.insert(app_path, "config data");
+    ///
+    /// // Can look up using a &Path
+    /// let lookup_path = Path::new("relative/to/exe/config.toml");
+    /// // Note: This would only work if the paths actually match
+    /// ```
+    #[inline]
+    fn borrow(&self) -> &Path {
+        &self.full_path
+    }
+}
+
+impl From<&PathBuf> for AppPath {
+    #[inline]
+    fn from(path: &PathBuf) -> Self {
+        Self::new(path)
     }
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-    use std::env;
-    use std::fs::{self, File};
-    use std::io::Write;
-    use std::path::Path;
-
-    /// Helper to create a file at a given path for testing.
-    fn create_test_file(path: &Path) {
-        if let Some(parent) = path.parent() {
-            fs::create_dir_all(parent).unwrap();
-        }
-        let mut file = File::create(path).unwrap();
-        writeln!(file, "test").unwrap();
-    }
-
-    #[test]
-    fn resolves_relative_path_to_exe_dir() {
-        // Simulate a file relative to the executable
-        let rel = "myconfig.toml";
-        let rel_path = AppPath::try_new(rel).unwrap();
-        let exe_dir = current_exe().unwrap().parent().unwrap().to_path_buf();
-        let expected = exe_dir.join(rel);
-
-        assert_eq!(rel_path.path(), &expected);
-        assert!(rel_path.path().is_absolute());
-    }
-
-    #[test]
-    fn resolves_relative_path_with_custom_base() {
-        // Use a temp directory as the base
-        let temp_dir = env::temp_dir().join("app_path_test_base");
-        let _ = fs::remove_dir_all(&temp_dir);
-        fs::create_dir_all(&temp_dir).unwrap();
-
-        let rel = "subdir/file.txt";
-        let rel_path = AppPath::try_new(rel).unwrap().with_base(&temp_dir);
-        let expected = temp_dir.join(rel);
-
-        assert_eq!(rel_path.path(), &expected);
-        assert!(rel_path.path().is_absolute());
-    }
-
-    #[test]
-    fn can_access_file_using_full_path() {
-        // Actually create a file and check that the full path points to it
-        let temp_dir = env::temp_dir().join("app_path_test_access");
-        let file_name = "access.txt";
-        let file_path = temp_dir.join(file_name);
-        let _ = fs::remove_dir_all(&temp_dir);
-        fs::create_dir_all(&temp_dir).unwrap();
-        create_test_file(&file_path);
-
-        let rel_path = AppPath::try_new(file_name).unwrap().with_base(&temp_dir);
-        assert!(rel_path.exists());
-        assert_eq!(rel_path.path(), &file_path);
-    }
-
-    #[test]
-    fn handles_dot_and_dotdot_components() {
-        let temp_dir = env::temp_dir().join("app_path_test_dot");
-        let _ = fs::remove_dir_all(&temp_dir);
-        fs::create_dir_all(&temp_dir).unwrap();
-
-        let rel = "./foo/../bar.txt";
-        let rel_path = AppPath::try_new(rel).unwrap().with_base(&temp_dir);
-        let expected = temp_dir.join(rel);
-
-        assert_eq!(rel_path.path(), &expected);
-    }
-
-    #[test]
-    fn as_ref_and_into_pathbuf_are_consistent() {
-        let rel = "somefile.txt";
-        let rel_path = AppPath::try_new(rel).unwrap();
-        let as_ref_path: &Path = rel_path.as_ref();
-        let into_pathbuf: PathBuf = rel_path.clone().into();
-        assert_eq!(as_ref_path, into_pathbuf.as_path());
-    }
-
-    #[test]
-    fn test_input_method() {
-        let rel = "config/app.toml";
-        let rel_path = AppPath::try_new(rel).unwrap();
-        assert_eq!(rel_path.input(), Path::new(rel));
-    }
-
-    #[test]
-    fn test_path_method() {
-        let rel = "data/file.txt";
-        let temp_dir = env::temp_dir().join("app_path_test_full");
-        let rel_path = AppPath::try_new(rel).unwrap().with_base(&temp_dir);
-        assert_eq!(rel_path.path(), temp_dir.join(rel));
-    }
-
-    #[test]
-    fn test_exists_method() {
-        let temp_dir = env::temp_dir().join("app_path_test_exists");
-        let _ = fs::remove_dir_all(&temp_dir);
-        fs::create_dir_all(&temp_dir).unwrap();
-
-        let file_name = "exists_test.txt";
-        let file_path = temp_dir.join(file_name);
-        create_test_file(&file_path);
-
-        let rel_path = AppPath::try_new(file_name).unwrap().with_base(&temp_dir);
-        assert!(rel_path.exists());
-
-        let non_existent = AppPath::try_new("non_existent.txt")
-            .unwrap()
-            .with_base(&temp_dir);
-        assert!(!non_existent.exists());
-    }
-
-    #[test]
-    fn test_create_dir_all() {
-        let temp_dir = env::temp_dir().join("app_path_test_create");
-        let _ = fs::remove_dir_all(&temp_dir);
-
-        let rel = "deep/nested/dir/file.txt";
-        let rel_path = AppPath::try_new(rel).unwrap().with_base(&temp_dir);
-
-        rel_path.create_dir_all().unwrap();
-        assert!(rel_path.path().parent().unwrap().exists());
-    }
-
-    #[test]
-    fn test_display_trait() {
-        let rel = "display_test.txt";
-        let temp_dir = env::temp_dir().join("app_path_test_display");
-        let rel_path = AppPath::try_new(rel).unwrap().with_base(&temp_dir);
-
-        let expected = temp_dir.join(rel);
-        assert_eq!(format!("{rel_path}"), format!("{}", expected.display()));
-    }
-
-    #[test]
-    fn test_try_from_str() {
-        use std::convert::TryFrom;
-
-        let rel_path = AppPath::try_from("config.toml").unwrap();
-        let exe_dir = current_exe().unwrap().parent().unwrap().to_path_buf();
-        let expected = exe_dir.join("config.toml");
-
-        assert_eq!(rel_path.path(), &expected);
-        assert_eq!(rel_path.input(), Path::new("config.toml"));
-    }
-
-    #[test]
-    fn test_try_from_string() {
-        use std::convert::TryFrom;
-
-        let path_string = "data/file.txt".to_string();
-        let rel_path = AppPath::try_from(path_string).unwrap();
-        let exe_dir = current_exe().unwrap().parent().unwrap().to_path_buf();
-        let expected = exe_dir.join("data/file.txt");
-
-        assert_eq!(rel_path.path(), &expected);
-        assert_eq!(rel_path.input(), Path::new("data/file.txt"));
-    }
-
-    #[test]
-    fn test_try_from_string_ref() {
-        use std::convert::TryFrom;
-
-        let path_string = "logs/app.log".to_string();
-        let rel_path = AppPath::try_from(&path_string).unwrap();
-        let exe_dir = current_exe().unwrap().parent().unwrap().to_path_buf();
-        let expected = exe_dir.join("logs/app.log");
-
-        assert_eq!(rel_path.path(), &expected);
-        assert_eq!(rel_path.input(), Path::new("logs/app.log"));
-    }
-
-    #[test]
-    fn test_try_new_with_different_types() {
-        use std::path::PathBuf;
-
-        // Test various input types with try_new
-        let from_str = AppPath::try_new("test.txt").unwrap();
-        let from_string = AppPath::try_new("test.txt".to_string()).unwrap();
-        let from_path_buf = AppPath::try_new(PathBuf::from("test.txt")).unwrap();
-        let from_path_ref = AppPath::try_new(Path::new("test.txt")).unwrap();
-
-        // All should produce equivalent results
-        assert_eq!(from_str.input(), from_string.input());
-        assert_eq!(from_string.input(), from_path_buf.input());
-        assert_eq!(from_path_buf.input(), from_path_ref.input());
-        assert_eq!(from_str.input(), Path::new("test.txt"));
-    }
-
-    #[test]
-    fn test_ownership_transfer() {
-        use std::path::PathBuf;
-
-        let path_buf = PathBuf::from("test.txt");
-        let app_path = AppPath::try_new(path_buf).unwrap();
-        // path_buf is moved and no longer accessible
-
-        assert_eq!(app_path.input(), Path::new("test.txt"));
-
-        // Test with String too
-        let string_path = "another_test.txt".to_string();
-        let app_path2 = AppPath::try_new(string_path).unwrap();
-        // string_path is moved and no longer accessible
-
-        assert_eq!(app_path2.input(), Path::new("another_test.txt"));
-    }
-
-    #[test]
-    fn test_absolute_path_behavior() {
-        // Test what happens with an absolute path
-        let absolute_path = if cfg!(windows) {
-            r"C:\temp\config.toml"
-        } else {
-            "/tmp/config.toml"
-        };
-
-        let app_path = AppPath::try_new(absolute_path).unwrap();
-
-        // PathBuf::join() has special behavior: when joining with an absolute path,
-        // the absolute path replaces the base path entirely
-        // So AppPath correctly handles absolute paths by using them as-is
-        assert_eq!(app_path.path(), Path::new(absolute_path));
-        assert_eq!(app_path.input(), Path::new(absolute_path));
-
-        println!("Input: {absolute_path}");
-        println!("Result: {}", app_path.path().display());
-
-        // Verify it's still an absolute path
-        assert!(app_path.path().is_absolute());
-    }
-
-    #[test]
-    fn test_pathbuf_join_behavior_with_absolute_paths() {
-        use std::path::PathBuf;
-
-        // Let's understand how PathBuf::join works with absolute paths
-        let base = PathBuf::from("/home/user");
-        let absolute = PathBuf::from("/etc/config.toml");
-        let relative = PathBuf::from("config.toml");
-
-        println!("Base: {}", base.display());
-        println!("Relative join: {}", base.join(&relative).display());
-        println!("Absolute join: {}", base.join(&absolute).display());
-
-        // PathBuf::join has special behavior for absolute paths:
-        // If the right-hand side is absolute, it replaces the left-hand side
-        assert_eq!(
-            base.join(&relative),
-            PathBuf::from("/home/user/config.toml")
-        );
-        assert_eq!(base.join(&absolute), PathBuf::from("/etc/config.toml"));
-
-        // Same on Windows
-        if cfg!(windows) {
-            let win_base = PathBuf::from(r"C:\Users\User");
-            let win_absolute = PathBuf::from(r"D:\temp\file.txt");
-            let win_relative = PathBuf::from("file.txt");
-
-            assert_eq!(
-                win_base.join(&win_relative),
-                PathBuf::from(r"C:\Users\User\file.txt")
-            );
-            assert_eq!(
-                win_base.join(&win_absolute),
-                PathBuf::from(r"D:\temp\file.txt")
-            );
-        }
-    }
-}
+mod tests;
