@@ -7,7 +7,7 @@
 //! ```rust
 //! use app_path::AppPath;
 //! use std::convert::TryFrom;
-//! use std::path::PathBuf;
+//! use std::path::{Path, PathBuf};
 //!
 //! // Create paths relative to your executable - accepts any path-like type
 //! let config = AppPath::try_new("config.toml")?;
@@ -21,10 +21,12 @@
 //! let cache = AppPath::try_new(path_buf)?; // PathBuf is moved
 //!
 //! // Works with any path-like type
-//! let from_path = AppPath::try_new(std::path::Path::new("temp.txt"))?;
+//! let from_path = AppPath::try_new(Path::new("temp.txt"))?;
 //!
-//! // Alternative: Use TryFrom for string types
-//! let settings = AppPath::try_from("settings.json")?;
+//! // Alternative: Use TryFrom for various path types
+//! let settings = AppPath::try_from("settings.json")?;         // &str
+//! let data_file = AppPath::try_from(PathBuf::from("data.db"))?; // PathBuf
+//! let temp_file = AppPath::try_from(Path::new("temp.log"))?;   // &Path
 //!
 //! // Get the paths for use with standard library functions
 //! println!("Config: {}", config.path().display());
@@ -34,6 +36,30 @@
 //! if !logs.exists() {
 //!     logs.create_dir_all()?;
 //! }
+//!
+//! # Ok::<(), Box<dyn std::error::Error>>(())
+//! ```
+//!
+//! ## Flexible Creation Methods
+//!
+//! ```rust
+//! use app_path::AppPath;
+//! use std::convert::TryFrom;
+//! use std::path::{Path, PathBuf};
+//!
+//! // Method 1: Direct construction (recommended)
+//! let config = AppPath::try_new("config.toml")?;
+//! let logs = AppPath::try_new(PathBuf::from("logs/app.log"))?;
+//!
+//! // Method 2: TryFrom for various path types
+//! let data1 = AppPath::try_from("data/users.db")?;              // &str
+//! let data2 = AppPath::try_from("settings.json".to_string())?;  // String
+//! let data3 = AppPath::try_from(Path::new("cache/data.bin"))?;  // &Path
+//! let data4 = AppPath::try_from(PathBuf::from("temp/file.txt"))?; // PathBuf
+//!
+//! // All methods support efficient ownership transfer
+//! let owned_path = PathBuf::from("important/data.db");
+//! let app_path = AppPath::try_from(owned_path)?; // PathBuf is moved
 //!
 //! # Ok::<(), Box<dyn std::error::Error>>(())
 //! ```
@@ -351,11 +377,19 @@ impl AsRef<Path> for AppPath {
     }
 }
 
-/// Ergonomic fallible conversion from string types.
+/// Ergonomic fallible conversion from common path types.
 ///
 /// These implementations allow you to create `AppPath` instances directly
-/// from strings, with proper error handling for the fallible operation.
-/// For other path types like `PathBuf`, use [`AppPath::try_new`] directly.
+/// from various path types, with proper error handling for the fallible operation.
+///
+/// # Supported Types
+///
+/// - `&str` - String literals and string slices
+/// - `String` - Owned strings (moved into `AppPath`)
+/// - `&String` - String references
+/// - `PathBuf` - Path buffers (moved into `AppPath`)
+/// - `&PathBuf` - Path buffer references
+/// - `&Path` - Path references
 ///
 /// # Errors
 ///
@@ -367,18 +401,41 @@ impl AsRef<Path> for AppPath {
 /// ```rust
 /// use app_path::AppPath;
 /// use std::convert::TryFrom;
+/// use std::path::{Path, PathBuf};
+///
+/// // From string types
+/// let config1 = AppPath::try_from("config.toml")?;
+/// let config2 = AppPath::try_from("config.toml".to_string())?;
+/// let config3 = AppPath::try_from(&"config.toml".to_string())?;
+///
+/// // From path types
+/// let config4 = AppPath::try_from(Path::new("config.toml"))?;
+/// let config5 = AppPath::try_from(PathBuf::from("config.toml"))?;
+/// let config6 = AppPath::try_from(&PathBuf::from("config.toml"))?;
+///
+/// // All produce equivalent results
+/// assert_eq!(config1.input(), config2.input());
+/// assert_eq!(config2.input(), config3.input());
+/// assert_eq!(config3.input(), config4.input());
+/// assert_eq!(config4.input(), config5.input());
+/// assert_eq!(config5.input(), config6.input());
+///
+/// # Ok::<(), Box<dyn std::error::Error>>(())
+/// ```
+///
+/// ## Ownership Transfer
+///
+/// ```rust
+/// use app_path::AppPath;
+/// use std::convert::TryFrom;
 /// use std::path::PathBuf;
 ///
-/// // From &str
-/// let config = AppPath::try_from("config.toml")?;
+/// // These move ownership (no cloning)
+/// let path_buf = PathBuf::from("data/users.db");
+/// let data1 = AppPath::try_from(path_buf)?; // path_buf is moved
 ///
-/// // From String (moves ownership)
-/// let data_file = "data/users.db".to_string();
-/// let data = AppPath::try_from(data_file)?;
-///
-/// // For PathBuf, use try_new directly (moves ownership)
-/// let path_buf = PathBuf::from("logs/app.log");
-/// let logs = AppPath::try_new(path_buf)?;
+/// let string_path = "logs/app.log".to_string();
+/// let data2 = AppPath::try_from(string_path)?; // string_path is moved
 ///
 /// # Ok::<(), Box<dyn std::error::Error>>(())
 /// ```
@@ -417,6 +474,30 @@ impl TryFrom<&String> for AppPath {
     type Error = std::io::Error;
 
     fn try_from(path: &String) -> Result<Self, Self::Error> {
+        AppPath::try_new(path)
+    }
+}
+
+impl TryFrom<&Path> for AppPath {
+    type Error = std::io::Error;
+
+    fn try_from(path: &Path) -> Result<Self, Self::Error> {
+        AppPath::try_new(path)
+    }
+}
+
+impl TryFrom<PathBuf> for AppPath {
+    type Error = std::io::Error;
+
+    fn try_from(path: PathBuf) -> Result<Self, Self::Error> {
+        AppPath::try_new(path)
+    }
+}
+
+impl TryFrom<&PathBuf> for AppPath {
+    type Error = std::io::Error;
+
+    fn try_from(path: &PathBuf) -> Result<Self, Self::Error> {
         AppPath::try_new(path)
     }
 }
@@ -691,5 +772,107 @@ mod tests {
                 PathBuf::from(r"D:\temp\file.txt")
             );
         }
+    }
+
+    #[test]
+    fn test_try_from_path_types() {
+        use std::convert::TryFrom;
+        use std::path::{Path, PathBuf};
+
+        let exe_dir = current_exe().unwrap().parent().unwrap().to_path_buf();
+        let expected = exe_dir.join("test.txt");
+
+        // Test &Path
+        let from_path_ref = AppPath::try_from(Path::new("test.txt")).unwrap();
+        assert_eq!(from_path_ref.path(), &expected);
+        assert_eq!(from_path_ref.input(), Path::new("test.txt"));
+
+        // Test PathBuf (moves ownership)
+        let path_buf = PathBuf::from("test.txt");
+        let from_path_buf = AppPath::try_from(path_buf).unwrap();
+        assert_eq!(from_path_buf.path(), &expected);
+        assert_eq!(from_path_buf.input(), Path::new("test.txt"));
+
+        // Test &PathBuf
+        let path_buf_ref = PathBuf::from("test.txt");
+        let from_path_buf_ref = AppPath::try_from(&path_buf_ref).unwrap();
+        assert_eq!(from_path_buf_ref.path(), &expected);
+        assert_eq!(from_path_buf_ref.input(), Path::new("test.txt"));
+    }
+
+    #[test]
+    fn test_try_from_ownership_transfer() {
+        use std::convert::TryFrom;
+        use std::path::PathBuf;
+
+        // Test that PathBuf ownership is transferred
+        let path_buf = PathBuf::from("ownership_test.txt");
+        let app_path = AppPath::try_from(path_buf).unwrap();
+        // path_buf is moved and no longer accessible
+        assert_eq!(app_path.input(), Path::new("ownership_test.txt"));
+
+        // Test that String ownership is transferred
+        let string_path = "string_ownership_test.txt".to_string();
+        let app_path2 = AppPath::try_from(string_path).unwrap();
+        // string_path is moved and no longer accessible
+        assert_eq!(app_path2.input(), Path::new("string_ownership_test.txt"));
+    }
+
+    #[test]
+    fn test_try_from_all_types_equivalent() {
+        use std::convert::TryFrom;
+        use std::path::{Path, PathBuf};
+
+        // All these should produce equivalent results
+        let from_str = AppPath::try_from("equivalent.txt").unwrap();
+        let from_string = AppPath::try_from("equivalent.txt".to_string()).unwrap();
+        let from_string_ref = AppPath::try_from(&"equivalent.txt".to_string()).unwrap();
+        let from_path = AppPath::try_from(Path::new("equivalent.txt")).unwrap();
+        let from_pathbuf = AppPath::try_from(PathBuf::from("equivalent.txt")).unwrap();
+        let from_pathbuf_ref = AppPath::try_from(&PathBuf::from("equivalent.txt")).unwrap();
+
+        // All should have the same input path
+        assert_eq!(from_str.input(), from_string.input());
+        assert_eq!(from_string.input(), from_string_ref.input());
+        assert_eq!(from_string_ref.input(), from_path.input());
+        assert_eq!(from_path.input(), from_pathbuf.input());
+        assert_eq!(from_pathbuf.input(), from_pathbuf_ref.input());
+
+        // All should have the same full path
+        assert_eq!(from_str.path(), from_string.path());
+        assert_eq!(from_string.path(), from_string_ref.path());
+        assert_eq!(from_string_ref.path(), from_path.path());
+        assert_eq!(from_path.path(), from_pathbuf.path());
+        assert_eq!(from_pathbuf.path(), from_pathbuf_ref.path());
+    }
+
+    #[test]
+    fn test_try_from_with_absolute_paths() {
+        use std::convert::TryFrom;
+        use std::path::{Path, PathBuf};
+
+        let absolute_path = if cfg!(windows) {
+            r"C:\temp\absolute_test.txt"
+        } else {
+            "/tmp/absolute_test.txt"
+        };
+
+        // Test all TryFrom implementations with absolute paths
+        let from_str = AppPath::try_from(absolute_path).unwrap();
+        let from_string = AppPath::try_from(absolute_path.to_string()).unwrap();
+        let from_path = AppPath::try_from(Path::new(absolute_path)).unwrap();
+        let from_pathbuf = AppPath::try_from(PathBuf::from(absolute_path)).unwrap();
+
+        // All should preserve the absolute path
+        assert_eq!(from_str.path(), Path::new(absolute_path));
+        assert_eq!(from_string.path(), Path::new(absolute_path));
+        assert_eq!(from_path.path(), Path::new(absolute_path));
+        assert_eq!(from_pathbuf.path(), Path::new(absolute_path));
+
+        // All should be absolute
+        assert!(from_str.path().is_absolute());
+        assert!(from_string.path().is_absolute());
+        assert!(from_path.path().is_absolute());
+        assert!(from_pathbuf.path().is_absolute());
     }
 }
