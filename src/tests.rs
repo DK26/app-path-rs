@@ -431,7 +431,7 @@ fn test_panic_conditions_documentation() {
     // part of static initialization, but we can document them
 
     // The actual panic would happen during the first call to any AppPath function
-    // or exe_dir() function when the LazyLock is initialized
+    // or exe_dir() function when the OnceLock is initialized
 
     // For testing purposes, we just verify that normal operation works
     let _config = AppPath::new("config.toml");

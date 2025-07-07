@@ -237,30 +237,35 @@ use std::env::current_exe;
 use std::hash::{Hash, Hasher};
 use std::ops::Deref;
 use std::path::{Path, PathBuf};
-use std::sync::LazyLock;
+use std::sync::OnceLock;
 
 // Global executable directory - computed once, cached forever
-static EXE_DIR: LazyLock<PathBuf> = LazyLock::new(|| {
-    let exe = current_exe().expect("Failed to determine executable location");
+static EXE_DIR: OnceLock<PathBuf> = OnceLock::new();
 
-    // Handle edge case: executable at filesystem root (jailed environments, etc.)
-    match exe.parent() {
-        Some(parent) => parent.to_path_buf(),
-        None => {
-            // If exe has no parent (e.g., running as "/init" or "C:\"),
-            // use the root directory itself
-            if exe.as_os_str().is_empty() {
-                panic!("Executable path is empty - unsupported environment");
+/// Internal function to initialize and get the executable directory
+fn exe_dir_inner() -> &'static PathBuf {
+    EXE_DIR.get_or_init(|| {
+        let exe = current_exe().expect("Failed to determine executable location");
+
+        // Handle edge case: executable at filesystem root (jailed environments, etc.)
+        match exe.parent() {
+            Some(parent) => parent.to_path_buf(),
+            None => {
+                // If exe has no parent (e.g., running as "/init" or "C:\"),
+                // use the root directory itself
+                if exe.as_os_str().is_empty() {
+                    panic!("Executable path is empty - unsupported environment");
+                }
+
+                // For root-level executables, use the root directory
+                exe.ancestors()
+                    .last()
+                    .expect("Failed to determine filesystem root")
+                    .to_path_buf()
             }
-
-            // For root-level executables, use the root directory
-            exe.ancestors()
-                .last()
-                .expect("Failed to determine filesystem root")
-                .to_path_buf()
         }
-    }
-});
+    })
+}
 
 /// Creates paths relative to the executable location for applications.
 ///
@@ -637,7 +642,7 @@ impl AppPath {
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
     pub fn new(path: impl AsRef<Path>) -> Self {
-        let full_path = EXE_DIR.join(path.as_ref());
+        let full_path = exe_dir_inner().join(path.as_ref());
         Self { full_path }
     }
 
@@ -734,7 +739,7 @@ impl AppPath {
 /// println!("Executable directory: {}", exe_dir().display());
 /// ```
 pub fn exe_dir() -> &'static Path {
-    &EXE_DIR
+    exe_dir_inner().as_path()
 }
 
 // Standard trait implementations

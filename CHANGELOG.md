@@ -31,7 +31,7 @@ let custom = AppPath::new(dir.join("file.txt")); // Use standard Path::join
 
 ### Added
 - **Infallible API design** - `new()` constructor that panics on rare system failures
-- **Static executable directory caching** - Uses `LazyLock` for optimal performance  
+- **Static executable directory caching** - Uses `OnceLock` for optimal performance  
 - Comprehensive trait implementations: `Default`, `PartialEq`, `Eq`, `PartialOrd`, `Ord`, `Hash`, `Deref<Target=Path>`, `Borrow<Path>`
 - Enhanced collection integration - `AppPath` now works seamlessly in `HashMap`, `BTreeSet`, etc.
 - `Default` implementation that points to the executable directory
@@ -47,9 +47,12 @@ let custom = AppPath::new(dir.join("file.txt")); // Use standard Path::join
 - **Better error handling examples** - Practical fallback patterns using `std::env::current_exe()`
 
 ### Performance
-- Static caching of executable directory using `LazyLock` for optimal performance
+- Static caching of executable directory using `OnceLock` for optimal performance on stable Rust
 - Aggressive inlining of trait implementations and core methods
 - Zero-allocation design for `impl AsRef<Path>` parameters
+
+### Fixed
+- **MSRV Compatibility** - Replaced `std::sync::LazyLock` with `std::sync::OnceLock` for stable Rust support (≥1.70)
 
 ### Documentation
 - Streamlined README focusing on API usage rather than compiler optimizations
