@@ -26,10 +26,6 @@
 //! // Alternative: Use TryFrom for string types
 //! let settings = AppPath::try_from("settings.json")?;
 //!
-//! // Absolute paths are used as-is (for system integration)
-//! let system_log = AppPath::try_new("/var/log/app.log")?;
-//! let windows_temp = AppPath::try_new(r"C:\temp\cache.dat")?;
-//!
 //! // Get the paths for use with standard library functions
 //! println!("Config: {}", config.path().display());
 //! println!("Data: {}", data.path().display());
@@ -40,6 +36,27 @@
 //! }
 //!
 //! # Ok::<(), Box<dyn std::error::Error>>(())
+//! ```
+//!
+//! ## Error Handling
+//!
+//! All constructors (`try_new`, `TryFrom`) can fail if the executable location
+//! cannot be determined. This is rare in normal applications but should be handled:
+//!
+//! ```rust
+//! use app_path::AppPath;
+//!
+//! match AppPath::try_new("config.toml") {
+//!     Ok(config) => {
+//!         // Use config.path() for file operations
+//!         println!("Config: {}", config.path().display());
+//!     }
+//!     Err(e) => {
+//!         eprintln!("Cannot determine executable location: {}", e);
+//!         // Fallback strategy - use current directory, temp directory, or exit
+//!         std::process::exit(1);
+//!     }
+//! }
 //! ```
 //!
 //! ## Path Resolution Behavior
@@ -115,6 +132,18 @@ impl AppPath {
     /// * `path` - A path that will be resolved relative to the executable.
     ///   Can be `&str`, `String`, `&Path`, `PathBuf`, etc.
     ///
+    /// # Errors
+    ///
+    /// Returns [`std::io::Error`] in the following cases:
+    ///
+    /// - **Cannot determine executable location** - When [`std::env::current_exe()`] fails
+    ///   (rare, but can happen in some embedded environments)
+    /// - **Executable has no parent directory** - When the executable is somehow at a filesystem root
+    ///   (extremely rare in normal usage)
+    ///
+    /// These errors are typically unrecoverable as they indicate fundamental system issues.
+    /// In normal desktop/server applications, this function should not fail.
+    ///
     /// # Examples
     ///
     /// ```rust
@@ -138,6 +167,23 @@ impl AppPath {
     /// let cache = AppPath::try_new(path_buf)?; // path_buf is moved
     ///
     /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// ```
+    ///
+    /// ## Error Handling
+    ///
+    /// ```rust
+    /// use app_path::AppPath;
+    ///
+    /// match AppPath::try_new("config.toml") {
+    ///     Ok(config) => {
+    ///         println!("Config path: {}", config.path().display());
+    ///     }
+    ///     Err(e) => {
+    ///         eprintln!("Failed to create app path: {}", e);
+    ///         // Fallback to current directory or exit
+    ///         std::process::exit(1);
+    ///     }
+    /// }
     /// ```
     pub fn try_new(path: impl Into<PathBuf>) -> Result<Self, std::io::Error> {
         let input_path = path.into();
@@ -311,6 +357,11 @@ impl AsRef<Path> for AppPath {
 /// from strings, with proper error handling for the fallible operation.
 /// For other path types like `PathBuf`, use [`AppPath::try_new`] directly.
 ///
+/// # Errors
+///
+/// Returns [`std::io::Error`] if the executable location cannot be determined.
+/// See [`AppPath::try_new`] for detailed error conditions.
+///
 /// # Examples
 ///
 /// ```rust
@@ -330,6 +381,21 @@ impl AsRef<Path> for AppPath {
 /// let logs = AppPath::try_new(path_buf)?;
 ///
 /// # Ok::<(), Box<dyn std::error::Error>>(())
+/// ```
+///
+/// ## Error Handling Example
+///
+/// ```rust
+/// use app_path::AppPath;
+/// use std::convert::TryFrom;
+///
+/// match AppPath::try_from("data.db") {
+///     Ok(path) => println!("Data path: {}", path.path().display()),
+///     Err(e) => {
+///         eprintln!("Failed to create path: {}", e);
+///         // Handle gracefully - maybe use current directory as fallback
+///     }
+/// }
 /// ```
 impl TryFrom<&str> for AppPath {
     type Error = std::io::Error;

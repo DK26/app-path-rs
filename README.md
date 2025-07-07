@@ -129,6 +129,43 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 ```
 
+## ⚠️ Error Handling
+
+All AppPath constructors can fail if the executable location cannot be determined. While this is rare in normal applications, it should be handled gracefully:
+
+```rust
+use app_path::AppPath;
+
+// Recommended: Handle errors explicitly
+match AppPath::try_new("config.toml") {
+    Ok(config) => {
+        println!("Config: {}", config.path().display());
+        // Use config.path() for file operations
+    }
+    Err(e) => {
+        eprintln!("Cannot determine executable location: {}", e);
+        // Fallback strategies:
+        // 1. Use current directory: std::env::current_dir()
+        // 2. Use temp directory: std::env::temp_dir()
+        // 3. Exit gracefully: std::process::exit(1)
+    }
+}
+
+// Alternative: Use ? operator with proper error propagation
+fn setup_config() -> Result<AppPath, std::io::Error> {
+    let config = AppPath::try_new("config.toml")?;
+    Ok(config)
+}
+```
+
+### When Errors Can Occur
+
+- **Cannot determine executable location** - Rare, but possible in some embedded environments
+- **Executable has no parent directory** - Extremely rare, when exe is at filesystem root
+
+These are typically unrecoverable system-level issues. In normal desktop/server applications, `AppPath::try_new()` should not fail.
+```
+
 ## 🔄 Ownership and Performance
 
 AppPath accepts any path-like type with optimal ownership handling:
