@@ -145,24 +145,70 @@
 //! **Edge case handling:**
 //! - **Root-level executables**: When executable runs at filesystem root (e.g., `/init`, `C:\`),
 //!   the crate uses the root directory itself as the base
-//! - **Jailed environments**: Properly handles chrooted or containerized environments
+//! - **Containerized environments**: Properly handles Docker, chroot, and other containerized environments
+//! - **Jailed environments**: Handles various forms of process isolation and sandboxing
 //!
-//! For applications that need fallible behavior, you can wrap AppPath usage:
+//! For applications that need fallible behavior, consider these practical alternatives:
 //!
 //! ```rust
 //! use app_path::AppPath;
-//! use std::panic;
+//! use std::env;
 //!
-//! fn safe_app_path(relative_path: &str) -> Option<AppPath> {
-//!     panic::catch_unwind(|| AppPath::new(relative_path)).ok()
+//! // Pattern 1: Environment variable fallback (recommended)
+//! fn get_config_path() -> AppPath {
+//!     if let Ok(custom_dir) = env::var("MYAPP_CONFIG_DIR") {
+//!         let config_path = std::path::Path::new(&custom_dir).join("config.toml");
+//!         AppPath::new(config_path)
+//!     } else {
+//!         AppPath::new("config.toml")
+//!     }
 //! }
 //!
-//! // Use with fallback strategy
-//! let config = safe_app_path("config.toml").unwrap_or_else(|| {
-//!     // Fallback to temp directory or current directory
-//!     AppPath::with_base(std::env::temp_dir(), "myapp_config.toml")
-//! });
+//! // Pattern 2: Conditional development/production paths
+//! fn get_data_path() -> AppPath {
+//!     if env::var("DEVELOPMENT").is_ok() {
+//!         let dev_path = env::current_dir().unwrap().join("dev_data").join("app.db");
+//!         AppPath::new(dev_path)
+//!     } else {
+//!         AppPath::new("data/app.db")
+//!     }
+//! }
 //! ```
+//!
+//! For applications that need to handle executable location failures:
+//!
+//! ```rust
+//! use app_path::AppPath;
+//! use std::env;
+//!
+//! fn get_config_path_safe() -> AppPath {
+//!     match env::current_exe() {
+//!         Ok(exe_path) => {
+//!             if let Some(exe_dir) = exe_path.parent() {
+//!                 let config_path = exe_dir.join("config.toml");
+//!                 AppPath::new(config_path)
+//!             } else {
+//!                 // Fallback for edge case where exe has no parent
+//!                 let temp_dir = env::temp_dir().join("myapp");
+//!                 let _ = std::fs::create_dir_all(&temp_dir);
+//!                 let config_path = temp_dir.join("config.toml");
+//!                 AppPath::new(config_path)
+//!             }
+//!         }
+//!         Err(_) => {
+//!             // Fallback when executable location cannot be determined
+//!             let temp_dir = env::temp_dir().join("myapp");
+//!             let _ = std::fs::create_dir_all(&temp_dir);
+//!             let config_path = temp_dir.join("config.toml");
+//!             AppPath::new(config_path)
+//!         }
+//!     }
+//! }
+//! ```
+//!
+//! **Note:** Using `std::env::current_exe()` directly is simpler and more idiomatic
+//! than `panic::catch_unwind` patterns. Most applications should use environment
+//! variable and conditional patterns instead.
 //!
 //! ## Flexible Creation Methods
 //!
@@ -185,7 +231,11 @@
 //! let app_path: AppPath = owned_path.into(); // PathBuf is moved efficiently
 //! ```
 
+use std::borrow::Borrow;
+use std::cmp::Ordering;
 use std::env::current_exe;
+use std::hash::{Hash, Hasher};
+use std::ops::Deref;
 use std::path::{Path, PathBuf};
 use std::sync::LazyLock;
 
@@ -217,6 +267,32 @@ static EXE_DIR: LazyLock<PathBuf> = LazyLock::new(|| {
 /// **AppPath** is the core type for building portable applications where all files and directories
 /// stay together with the executable. This design choice makes applications truly portable -
 /// they can run from USB drives, network shares, or any directory without installation.
+///
+/// ## Available Trait Implementations
+///
+/// `AppPath` implements a comprehensive set of traits for seamless integration with Rust's
+/// standard library and idiomatic code patterns:
+///
+/// **Core Traits:**
+/// - `Clone` - Efficient cloning (only copies the resolved path)
+/// - `Debug` - Useful debug output showing the resolved path
+/// - `Default` - Creates a path pointing to the executable directory
+/// - `Display` - Human-readable path display
+///
+/// **Comparison Traits:**
+/// - `PartialEq`, `Eq` - Compare paths for equality
+/// - `PartialOrd`, `Ord` - Lexicographic ordering for sorting
+/// - `Hash` - Use as keys in `HashMap`, `HashSet`, etc.
+///
+/// **Conversion Traits:**
+/// - `AsRef<Path>` - Use with any API expecting `&Path`
+/// - `Deref<Target=Path>` - Direct access to `Path` methods (e.g., `.extension()`)
+/// - `Borrow<Path>` - Enable borrowing as `&Path` for collection compatibility
+/// - `From<T>` for `&str`, `String`, `&Path`, `PathBuf`, etc. - Flexible construction
+/// - `Into<PathBuf>` - Convert to owned `PathBuf`
+///
+/// These implementations make `AppPath` a **zero-cost abstraction** that works seamlessly
+/// with existing Rust code while providing portable path resolution.
 ///
 /// ## Design Rationale
 ///
@@ -368,6 +444,56 @@ static EXE_DIR: LazyLock<PathBuf> = LazyLock::new(|| {
 ///
 /// # Ok::<(), Box<dyn std::error::Error>>(())
 /// ```
+///
+/// ## Trait Implementation Examples
+///
+/// `AppPath` implements many useful traits that enable ergonomic usage patterns:
+///
+/// ```rust
+/// use app_path::AppPath;
+/// use std::collections::{HashMap, BTreeSet};
+///
+/// // Default trait - creates path to executable directory
+/// let exe_dir = AppPath::default();
+/// assert_eq!(exe_dir, AppPath::new(""));
+///
+/// // Comparison traits - enable sorting and equality checks
+/// let mut paths = vec![
+///     AppPath::new("z.txt"),
+///     AppPath::new("a.txt"),
+///     AppPath::new("m.txt"),
+/// ];
+/// paths.sort(); // Uses Ord trait
+/// assert!(paths[0] < paths[1]); // Uses PartialOrd trait
+///
+/// // Hash trait - use as keys in collections
+/// let mut file_types = HashMap::new();
+/// file_types.insert(AppPath::new("config.toml"), "Configuration");
+/// file_types.insert(AppPath::new("data.db"), "Database");
+///
+/// // Ordered collections work automatically
+/// let mut sorted_paths = BTreeSet::new();
+/// sorted_paths.insert(AppPath::new("config.toml"));
+/// sorted_paths.insert(AppPath::new("data.db"));
+///
+/// // Deref trait - direct access to Path methods
+/// let config = AppPath::new("config.toml");
+/// assert_eq!(config.extension(), Some("toml".as_ref())); // Direct Path method
+/// assert_eq!(config.file_name(), Some("config.toml".as_ref()));
+///
+/// // Works with functions expecting &Path (deref coercion)
+/// fn analyze_path(path: &std::path::Path) -> Option<&str> {
+///     path.extension()?.to_str()
+/// }
+/// assert_eq!(analyze_path(&config), Some("toml"));
+///
+/// // From trait - flexible construction from many types
+/// let from_str: AppPath = "data.txt".into();
+/// let from_pathbuf: AppPath = std::path::PathBuf::from("logs.txt").into();
+///
+/// // Display trait - human-readable output
+/// println!("Config path: {}", config); // Clean path display
+/// ```
 #[derive(Clone, Debug)]
 pub struct AppPath {
     full_path: PathBuf,
@@ -515,144 +641,6 @@ impl AppPath {
         Self { full_path }
     }
 
-    /// Creates paths relative to a custom base directory.
-    ///
-    /// This static method allows you to override the executable directory and specify
-    /// a custom base directory instead. This is particularly valuable for:
-    ///
-    /// ## Primary Use Cases
-    ///
-    /// **Testing and Development:**
-    /// - Isolate tests with temporary directories
-    /// - Mock different deployment layouts
-    /// - Test portable application behavior without moving executables
-    ///
-    /// **Custom Application Layouts:**
-    /// - Multi-executable applications with shared data directories
-    /// - Applications that need to access files in sibling directories
-    /// - Deployment scenarios where data is separate from executable
-    ///
-    /// **Fallback Strategies:**
-    /// - Provide alternative base directories when executable location detection fails
-    /// - Implement graceful degradation for unusual deployment environments
-    ///
-    /// ## Design Rationale
-    ///
-    /// **Why a static method instead of instance method?**
-    /// - Maintains consistent API with `AppPath::new()`
-    /// - Clearly indicates this creates a new `AppPath` with different behavior
-    /// - Avoids confusion about whether it modifies existing instances
-    /// - Follows Rust conventions for alternative constructors
-    ///
-    /// **Why accept `impl AsRef<Path>` for both parameters?**
-    /// - Consistent with `AppPath::new()` for API uniformity
-    /// - Allows efficient usage with any path-like types
-    /// - Avoids unnecessary allocations through borrowing
-    ///
-    /// # Arguments
-    ///
-    /// * `base` - The base directory to use instead of the executable directory.
-    ///   Accepts any type implementing [`AsRef<Path>`]
-    /// * `path` - The path relative to the base directory.
-    ///   Accepts any type implementing [`AsRef<Path>`]
-    ///
-    /// # Performance
-    ///
-    /// This method is as efficient as `AppPath::new()`:
-    /// - No allocation overhead from `AsRef<Path>` usage
-    /// - Direct path joining without intermediate allocations
-    /// - Suitable for performance-critical code paths
-    ///
-    /// # Examples
-    ///
-    /// ## Testing with Temporary Directories
-    ///
-    /// ```rust
-    /// use app_path::AppPath;
-    /// use std::env;
-    ///
-    /// #[cfg(test)]
-    /// mod tests {
-    ///     use super::*;
-    ///     use std::fs;
-    ///
-    ///     #[test]
-    ///     fn test_config_loading() {
-    ///         // Create isolated test environment
-    ///         let test_dir = env::temp_dir().join("myapp_test");
-    ///         fs::create_dir_all(&test_dir).unwrap();
-    ///
-    ///         // Test with custom base directory
-    ///         let config = AppPath::with_base(&test_dir, "config.toml");
-    ///         assert!(!config.exists());
-    ///
-    ///         // Create test config and verify
-    ///         fs::write(config.path(), "debug = true").unwrap();
-    ///         assert!(config.exists());
-    ///
-    ///         // Cleanup
-    ///         fs::remove_dir_all(&test_dir).unwrap();
-    ///     }
-    /// }
-    /// ```
-    ///
-    /// ## Custom Application Layouts
-    ///
-    /// ```rust
-    /// use app_path::AppPath;
-    /// use std::env;
-    ///
-    /// // Multi-executable application with shared data
-    /// let shared_data = env::current_exe()
-    ///     .unwrap()
-    ///     .parent()
-    ///     .unwrap()
-    ///     .parent()
-    ///     .unwrap()
-    ///     .join("shared");
-    ///
-    /// let config = AppPath::with_base(&shared_data, "config.toml");
-    /// let database = AppPath::with_base(&shared_data, "data/app.db");
-    /// ```
-    ///
-    /// ## Fallback Strategy
-    ///
-    /// ```rust
-    /// use app_path::AppPath;
-    /// use std::{env, panic};
-    ///
-    /// fn get_config_path() -> AppPath {
-    ///     // Try normal executable-relative path first
-    ///     panic::catch_unwind(|| AppPath::new("config.toml"))
-    ///         .unwrap_or_else(|_| {
-    ///             // Fallback to user's home directory
-    ///             let home = env::var("HOME").unwrap_or_else(|_| ".".to_string());
-    ///             AppPath::with_base(home, ".myapp/config.toml")
-    ///         })
-    /// }
-    /// ```
-    ///
-    /// ## Development vs Production
-    ///
-    /// ```rust
-    /// use app_path::AppPath;
-    /// use std::env;
-    ///
-    /// fn get_data_path() -> AppPath {
-    ///     if env::var("DEVELOPMENT").is_ok() {
-    ///         // Development: Use project root
-    ///         AppPath::with_base(".", "dev_data/test.db")
-    ///     } else {
-    ///         // Production: Use executable directory
-    ///         AppPath::new("data/app.db")
-    ///     }
-    /// }
-    /// ```
-    pub fn with_base(base: impl AsRef<Path>, path: impl AsRef<Path>) -> Self {
-        let full_path = base.as_ref().join(path.as_ref());
-        Self { full_path }
-    }
-
     /// Get the full resolved path.
     ///
     /// This is the primary method for getting the actual filesystem path
@@ -709,7 +697,8 @@ impl AppPath {
     ///
     /// // Use a temporary directory for the example
     /// let temp_dir = env::temp_dir().join("app_path_example");
-    /// let data_file = AppPath::with_base(&temp_dir, "data/users/profile.json");
+    /// let data_file_path = temp_dir.join("data/users/profile.json");
+    /// let data_file = AppPath::new(data_file_path);
     ///
     /// // Ensure the "data/users" directory exists
     /// data_file.create_dir_all()?;
@@ -750,6 +739,7 @@ pub fn exe_dir() -> &'static Path {
 
 // Standard trait implementations
 impl std::fmt::Display for AppPath {
+    #[inline]
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.full_path.display())
     }
@@ -771,498 +761,232 @@ impl AsRef<Path> for AppPath {
 
 // Infallible From implementations for common types
 impl From<&str> for AppPath {
+    #[inline]
     fn from(path: &str) -> Self {
         Self::new(path)
     }
 }
 
 impl From<String> for AppPath {
+    #[inline]
     fn from(path: String) -> Self {
         Self::new(path)
     }
 }
 
 impl From<&String> for AppPath {
+    #[inline]
     fn from(path: &String) -> Self {
         Self::new(path)
     }
 }
 
 impl From<&Path> for AppPath {
+    #[inline]
     fn from(path: &Path) -> Self {
         Self::new(path)
     }
 }
 
 impl From<PathBuf> for AppPath {
+    #[inline]
     fn from(path: PathBuf) -> Self {
         Self::new(path)
     }
 }
 
+// === Additional Trait Implementations ===
+
+impl Default for AppPath {
+    /// Creates an `AppPath` pointing to the executable's directory.
+    ///
+    /// This is equivalent to calling `AppPath::new("")`. The default instance
+    /// represents the directory containing the executable, which is useful as
+    /// a starting point for portable applications.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use app_path::AppPath;
+    ///
+    /// let exe_dir = AppPath::default();
+    /// let empty_path = AppPath::new("");
+    ///
+    /// // Default should be equivalent to new("")
+    /// assert_eq!(exe_dir, empty_path);
+    ///
+    /// // Both should point to the executable directory
+    /// assert_eq!(exe_dir.path(), app_path::exe_dir());
+    /// ```
+    #[inline]
+    fn default() -> Self {
+        Self::new("")
+    }
+}
+
+impl PartialEq for AppPath {
+    /// Compares two `AppPath` instances for equality based on their resolved paths.
+    ///
+    /// Two `AppPath` instances are considered equal if their full resolved paths
+    /// are identical, regardless of how they were constructed.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use app_path::AppPath;
+    ///
+    /// let path1 = AppPath::new("config.toml");
+    /// let path2 = AppPath::new("config.toml");
+    /// let path3 = AppPath::new("other.toml");
+    ///
+    /// assert_eq!(path1, path2);
+    /// assert_ne!(path1, path3);
+    /// ```
+    #[inline]
+    fn eq(&self, other: &Self) -> bool {
+        self.full_path == other.full_path
+    }
+}
+
+impl Eq for AppPath {}
+
+impl PartialOrd for AppPath {
+    /// Compares two `AppPath` instances lexicographically based on their resolved paths.
+    ///
+    /// The comparison is performed on the full resolved paths, providing consistent
+    /// ordering for sorting and collection operations.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use app_path::AppPath;
+    ///
+    /// let path1 = AppPath::new("a.txt");
+    /// let path2 = AppPath::new("b.txt");
+    ///
+    /// assert!(path1 < path2);
+    /// ```
+    #[inline]
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for AppPath {
+    /// Compares two `AppPath` instances lexicographically based on their resolved paths.
+    ///
+    /// This provides a total ordering that enables `AppPath` to be used in sorted
+    /// collections like `BTreeMap` and `BTreeSet`.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use app_path::AppPath;
+    /// use std::collections::BTreeSet;
+    ///
+    /// let mut paths = BTreeSet::new();
+    /// paths.insert(AppPath::new("config.toml"));
+    /// paths.insert(AppPath::new("data.db"));
+    /// paths.insert(AppPath::new("app.log"));
+    ///
+    /// // Paths are automatically sorted lexicographically
+    /// let sorted: Vec<_> = paths.into_iter().collect();
+    /// ```
+    #[inline]
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.full_path.cmp(&other.full_path)
+    }
+}
+
+impl Hash for AppPath {
+    /// Computes a hash for the `AppPath` based on its resolved path.
+    ///
+    /// This enables `AppPath` to be used as keys in hash-based collections
+    /// like `HashMap` and `HashSet`. The hash is computed from the full
+    /// resolved path, ensuring consistent behavior.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use app_path::AppPath;
+    /// use std::collections::HashMap;
+    ///
+    /// let mut config_map = HashMap::new();
+    /// let config_path = AppPath::new("config.toml");
+    /// config_map.insert(config_path, "Configuration file");
+    /// ```
+    #[inline]
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.full_path.hash(state);
+    }
+}
+
+impl Deref for AppPath {
+    type Target = Path;
+
+    /// Provides direct access to the underlying `Path` through deref coercion.
+    ///
+    /// This allows `AppPath` to be used directly with any API that expects a `&Path`,
+    /// making it a zero-cost abstraction in many contexts. All `Path` methods become
+    /// directly available on `AppPath` instances.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use app_path::AppPath;
+    ///
+    /// let app_path = AppPath::new("config.toml");
+    ///
+    /// // Direct access to Path methods through deref
+    /// assert_eq!(app_path.extension(), Some("toml".as_ref()));
+    /// assert_eq!(app_path.file_name(), Some("config.toml".as_ref()));
+    ///
+    /// // Works with functions expecting &Path
+    /// fn process_path(path: &std::path::Path) {
+    ///     println!("Processing: {}", path.display());
+    /// }
+    ///
+    /// process_path(&app_path); // Automatic deref coercion
+    /// ```
+    #[inline]
+    fn deref(&self) -> &Self::Target {
+        &self.full_path
+    }
+}
+
+impl Borrow<Path> for AppPath {
+    /// Allows `AppPath` to be borrowed as a `Path`.
+    ///
+    /// This enables `AppPath` to be used seamlessly in collections that are
+    /// keyed by `Path`, and allows for efficient lookups using `&Path` values.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use app_path::AppPath;
+    /// use std::collections::HashMap;
+    /// use std::path::Path;
+    ///
+    /// let mut path_map = HashMap::new();
+    /// let app_path = AppPath::new("config.toml");
+    /// path_map.insert(app_path, "config data");
+    ///
+    /// // Can look up using a &Path
+    /// let lookup_path = Path::new("relative/to/exe/config.toml");
+    /// // Note: This would only work if the paths actually match
+    /// ```
+    #[inline]
+    fn borrow(&self) -> &Path {
+        &self.full_path
+    }
+}
+
 impl From<&PathBuf> for AppPath {
+    #[inline]
     fn from(path: &PathBuf) -> Self {
         Self::new(path)
     }
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-    use std::env;
-    use std::fs::{self, File};
-    use std::io::Write;
-    use std::path::Path;
-
-    /// Helper to create a file at a given path for testing.
-    fn create_test_file(path: &Path) {
-        if let Some(parent) = path.parent() {
-            fs::create_dir_all(parent).unwrap();
-        }
-        let mut file = File::create(path).unwrap();
-        writeln!(file, "test").unwrap();
-    }
-
-    #[test]
-    fn resolves_relative_path_to_exe_dir() {
-        let rel = "myconfig.toml";
-        let rel_path = AppPath::new(rel);
-        let expected = exe_dir().join(rel);
-
-        assert_eq!(rel_path.path(), &expected);
-        assert!(rel_path.path().is_absolute());
-    }
-
-    #[test]
-    fn resolves_relative_path_with_custom_base() {
-        let temp_dir = env::temp_dir().join("app_path_test_base");
-        let _ = fs::remove_dir_all(&temp_dir);
-        fs::create_dir_all(&temp_dir).unwrap();
-
-        let rel = "subdir/file.txt";
-        let rel_path = AppPath::with_base(&temp_dir, rel);
-        let expected = temp_dir.join(rel);
-
-        assert_eq!(rel_path.path(), &expected);
-        assert!(rel_path.path().is_absolute());
-    }
-
-    #[test]
-    fn can_access_file_using_full_path() {
-        let temp_dir = env::temp_dir().join("app_path_test_access");
-        let file_name = "access.txt";
-        let file_path = temp_dir.join(file_name);
-        let _ = fs::remove_dir_all(&temp_dir);
-        fs::create_dir_all(&temp_dir).unwrap();
-        create_test_file(&file_path);
-
-        let rel_path = AppPath::with_base(&temp_dir, file_name);
-        assert!(rel_path.exists());
-        assert_eq!(rel_path.path(), &file_path);
-    }
-
-    #[test]
-    fn handles_dot_and_dotdot_components() {
-        let temp_dir = env::temp_dir().join("app_path_test_dot");
-        let _ = fs::remove_dir_all(&temp_dir);
-        fs::create_dir_all(&temp_dir).unwrap();
-
-        let rel = "./foo/../bar.txt";
-        let rel_path = AppPath::with_base(&temp_dir, rel);
-        let expected = temp_dir.join(rel);
-
-        assert_eq!(rel_path.path(), &expected);
-    }
-
-    #[test]
-    fn as_ref_and_into_pathbuf_are_consistent() {
-        let rel = "somefile.txt";
-        let rel_path = AppPath::new(rel);
-        let as_ref_path: &Path = rel_path.as_ref();
-        let into_pathbuf: PathBuf = rel_path.clone().into();
-        assert_eq!(as_ref_path, into_pathbuf.as_path());
-    }
-
-    #[test]
-    fn test_path_method() {
-        let rel = "data/file.txt";
-        let temp_dir = env::temp_dir().join("app_path_test_full");
-        let rel_path = AppPath::with_base(&temp_dir, rel);
-        assert_eq!(rel_path.path(), temp_dir.join(rel));
-    }
-
-    #[test]
-    fn test_exists_method() {
-        let temp_dir = env::temp_dir().join("app_path_test_exists");
-        let _ = fs::remove_dir_all(&temp_dir);
-        fs::create_dir_all(&temp_dir).unwrap();
-
-        let file_name = "exists_test.txt";
-        let file_path = temp_dir.join(file_name);
-        create_test_file(&file_path);
-
-        let rel_path = AppPath::with_base(&temp_dir, file_name);
-        assert!(rel_path.exists());
-
-        let non_existent = AppPath::with_base(&temp_dir, "non_existent.txt");
-        assert!(!non_existent.exists());
-    }
-
-    #[test]
-    fn test_create_dir_all() {
-        let temp_dir = env::temp_dir().join("app_path_test_create");
-        let _ = fs::remove_dir_all(&temp_dir);
-
-        let rel = "deep/nested/dir/file.txt";
-        let rel_path = AppPath::with_base(&temp_dir, rel);
-
-        rel_path.create_dir_all().unwrap();
-        assert!(rel_path.path().parent().unwrap().exists());
-    }
-
-    #[test]
-    fn test_display_trait() {
-        let rel = "display_test.txt";
-        let temp_dir = env::temp_dir().join("app_path_test_display");
-        let rel_path = AppPath::with_base(&temp_dir, rel);
-
-        let expected = temp_dir.join(rel);
-        assert_eq!(format!("{rel_path}"), format!("{}", expected.display()));
-    }
-
-    #[test]
-    fn test_from_str() {
-        let rel_path = AppPath::from("config.toml");
-        let expected = exe_dir().join("config.toml");
-
-        assert_eq!(rel_path.path(), &expected);
-    }
-
-    #[test]
-    fn test_from_string() {
-        let path_string = "data/file.txt".to_string();
-        let rel_path = AppPath::from(path_string);
-        let expected = exe_dir().join("data/file.txt");
-
-        assert_eq!(rel_path.path(), &expected);
-    }
-
-    #[test]
-    fn test_from_string_ref() {
-        let path_string = "logs/app.log".to_string();
-        let rel_path = AppPath::from(&path_string);
-        let expected = exe_dir().join("logs/app.log");
-
-        assert_eq!(rel_path.path(), &expected);
-    }
-
-    #[test]
-    fn test_new_with_different_types() {
-        use std::path::PathBuf;
-
-        // Test various input types with new
-        let from_str = AppPath::new("test.txt");
-        let test_string = "test.txt".to_string(); // Intentionally create String to test type
-        let from_string = AppPath::new(test_string);
-        let from_path_buf = AppPath::new(PathBuf::from("test.txt"));
-        let from_path_ref = AppPath::new(Path::new("test.txt"));
-
-        // All should produce equivalent results
-        assert_eq!(from_str.path(), from_string.path());
-        assert_eq!(from_string.path(), from_path_buf.path());
-        assert_eq!(from_path_buf.path(), from_path_ref.path());
-    }
-
-    #[test]
-    fn test_ownership_transfer() {
-        use std::path::PathBuf;
-
-        let path_buf = PathBuf::from("test.txt");
-        let app_path = AppPath::new(path_buf);
-        // path_buf is moved and no longer accessible
-
-        let expected = exe_dir().join("test.txt");
-        assert_eq!(app_path.path(), &expected);
-
-        // Test with String too
-        let string_path = "another_test.txt".to_string();
-        let app_path2 = AppPath::new(string_path);
-        // string_path is moved and no longer accessible
-
-        let expected2 = exe_dir().join("another_test.txt");
-        assert_eq!(app_path2.path(), &expected2);
-    }
-
-    #[test]
-    fn test_absolute_path_behavior() {
-        let absolute_path = if cfg!(windows) {
-            r"C:\temp\config.toml"
-        } else {
-            "/tmp/config.toml"
-        };
-
-        let app_path = AppPath::new(absolute_path);
-
-        // PathBuf::join() with absolute paths replaces the base path entirely
-        assert_eq!(app_path.path(), Path::new(absolute_path));
-        assert!(app_path.path().is_absolute());
-    }
-
-    #[test]
-    fn test_exe_dir_function() {
-        let dir = exe_dir();
-        assert!(dir.is_absolute());
-
-        // Should be consistent with AppPath behavior
-        let config = AppPath::new("test.txt");
-        let expected = dir.join("test.txt");
-        assert_eq!(config.path(), &expected);
-    }
-
-    #[test]
-    fn test_from_implementations() {
-        use std::path::{Path, PathBuf};
-
-        let expected = exe_dir().join("test.txt");
-
-        // Test all From implementations
-        let from_str: AppPath = "test.txt".into();
-        let from_string: AppPath = "test.txt".to_string().into();
-        let from_string_ref: AppPath = (&"test.txt".to_string()).into();
-        let from_path: AppPath = Path::new("test.txt").into();
-        let from_pathbuf: AppPath = PathBuf::from("test.txt").into();
-        let from_pathbuf_ref: AppPath = (&PathBuf::from("test.txt")).into();
-
-        // All should produce the same result
-        assert_eq!(from_str.path(), &expected);
-        assert_eq!(from_string.path(), &expected);
-        assert_eq!(from_string_ref.path(), &expected);
-        assert_eq!(from_path.path(), &expected);
-        assert_eq!(from_pathbuf.path(), &expected);
-        assert_eq!(from_pathbuf_ref.path(), &expected);
-    }
-
-    #[test]
-    fn test_with_base_static_method() {
-        let temp_dir = env::temp_dir().join("app_path_test_with_base");
-        let _ = fs::remove_dir_all(&temp_dir);
-        fs::create_dir_all(&temp_dir).unwrap();
-
-        let rel = "config.toml";
-        let app_path = AppPath::with_base(&temp_dir, rel);
-        let expected = temp_dir.join(rel);
-
-        assert_eq!(app_path.path(), &expected);
-    }
-
-    #[test]
-    fn test_asref_path_efficiency() {
-        use std::path::{Path, PathBuf};
-
-        // Test that AsRef<Path> works efficiently with various types
-        let str_path = "test.txt";
-        let string_path = "test.txt".to_string();
-        let path_ref = Path::new("test.txt");
-        let path_buf = PathBuf::from("test.txt");
-
-        let from_str = AppPath::new(str_path);
-        let from_string = AppPath::new(&string_path); // Reference to avoid move
-        let from_path = AppPath::new(path_ref);
-        let from_pathbuf = AppPath::new(&path_buf); // Reference to avoid move
-
-        let expected = exe_dir().join("test.txt");
-
-        assert_eq!(from_str.path(), &expected);
-        assert_eq!(from_string.path(), &expected);
-        assert_eq!(from_path.path(), &expected);
-        assert_eq!(from_pathbuf.path(), &expected);
-
-        // Verify original values are still accessible (weren't moved)
-        assert_eq!(string_path, "test.txt");
-        assert_eq!(path_buf, PathBuf::from("test.txt"));
-    }
-
-    #[test]
-    fn test_root_directory_edge_case() {
-        // This test simulates the edge case where an executable might be at filesystem root
-        // We can't easily test this in practice, but we can test the logic
-
-        // Test Unix-style root
-        let unix_root = Path::new("/");
-        let config = AppPath::with_base(unix_root, "config.toml");
-        assert_eq!(config.path(), Path::new("/config.toml"));
-
-        // Test Windows-style root
-        if cfg!(windows) {
-            let windows_root = Path::new(r"C:\");
-            let config = AppPath::with_base(windows_root, "config.toml");
-            assert_eq!(config.path(), Path::new(r"C:\config.toml"));
-        }
-    }
-
-    #[test]
-    fn test_root_directory_behavior_with_absolute_paths() {
-        // Test that absolute paths work correctly even when base is root
-        let root = if cfg!(windows) {
-            Path::new(r"C:\")
-        } else {
-            Path::new("/")
-        };
-
-        let absolute_path = if cfg!(windows) {
-            r"D:\temp\config.toml"
-        } else {
-            "/tmp/config.toml"
-        };
-
-        let app_path = AppPath::with_base(root, absolute_path);
-
-        // Absolute paths should override the base entirely
-        assert_eq!(app_path.path(), Path::new(absolute_path));
-        assert!(app_path.path().is_absolute());
-    }
-
-    #[test]
-    fn test_root_directory_nested_paths() {
-        // Test that nested relative paths work correctly from root
-        let root = if cfg!(windows) {
-            Path::new(r"C:\")
-        } else {
-            Path::new("/")
-        };
-
-        let nested_path = "app/data/config.toml";
-        let app_path = AppPath::with_base(root, nested_path);
-
-        let expected = if cfg!(windows) {
-            Path::new(r"C:\app\data\config.toml")
-        } else {
-            Path::new("/app/data/config.toml")
-        };
-
-        assert_eq!(app_path.path(), expected);
-        assert!(app_path.path().is_absolute());
-    }
-
-    #[test]
-    fn test_exe_dir_static_initialization() {
-        // Test that exe_dir() works and returns an absolute path
-        let dir = exe_dir();
-        assert!(dir.is_absolute());
-
-        // Test that it's consistent across multiple calls
-        let dir2 = exe_dir();
-        assert_eq!(dir, dir2);
-
-        // Test that it works with AppPath
-        let config = AppPath::new("test.txt");
-        let expected = dir.join("test.txt");
-        assert_eq!(config.path(), &expected);
-    }
-
-    #[test]
-    fn test_exe_dir_edge_case_simulation() {
-        // We can't easily simulate the actual root directory edge case,
-        // but we can test that our logic works correctly
-
-        use std::path::PathBuf;
-
-        // Simulate what would happen with a root-level executable
-        let fake_root_exe = if cfg!(windows) {
-            PathBuf::from(r"C:\app.exe")
-        } else {
-            PathBuf::from("/init")
-        };
-
-        // Test the logic that would be used in the actual edge case
-        let parent = fake_root_exe.parent();
-        let base_dir = match parent {
-            Some(p) => p.to_path_buf(),
-            None => {
-                // This is the edge case logic from our implementation
-                fake_root_exe.ancestors().last().unwrap().to_path_buf()
-            }
-        };
-
-        let expected_root = if cfg!(windows) {
-            PathBuf::from(r"C:\")
-        } else {
-            PathBuf::from("/")
-        };
-
-        assert_eq!(base_dir, expected_root);
-    }
-
-    #[test]
-    fn test_containerized_environment_simulation() {
-        // Test behavior that might occur in containerized environments
-        // where the executable could be at various root-like locations
-
-        let container_roots = if cfg!(windows) {
-            vec![r"C:\", r"D:\app"]
-        } else {
-            vec!["/", "/app", "/usr/bin"]
-        };
-
-        for root in container_roots {
-            let config = AppPath::with_base(root, "config.toml");
-            let data = AppPath::with_base(root, "data/app.db");
-
-            // Paths should be properly resolved
-            assert!(config.path().is_absolute());
-            assert!(data.path().is_absolute());
-
-            // Should maintain the root as prefix
-            assert!(config.path().starts_with(root));
-            assert!(data.path().starts_with(root));
-        }
-    }
-
-    #[test]
-    fn test_jailed_environment_patterns() {
-        // Test common patterns that might occur in jailed/chrooted environments
-        let jail_root = if cfg!(windows) {
-            r"C:\jail"
-        } else {
-            "/var/jail"
-        };
-
-        // Test that relative paths work correctly in jailed environments
-        let config = AppPath::with_base(jail_root, "etc/config.toml");
-        let data = AppPath::with_base(jail_root, "var/data/app.db");
-        let logs = AppPath::with_base(jail_root, "var/log/app.log");
-
-        // All paths should be absolute and start with the jail root
-        assert!(config.path().is_absolute());
-        assert!(data.path().is_absolute());
-        assert!(logs.path().is_absolute());
-
-        assert!(config.path().starts_with(jail_root));
-        assert!(data.path().starts_with(jail_root));
-        assert!(logs.path().starts_with(jail_root));
-    }
-
-    #[test]
-    fn test_panic_conditions_documentation() {
-        // This test documents the conditions that would cause panics
-        // It doesn't actually panic, but serves as documentation
-
-        // These are the conditions that would cause the static initialization to panic:
-        // 1. std::env::current_exe() fails
-        // 2. The executable path is empty
-        // 3. ancestors().last() fails (extremely rare)
-
-        // We can't easily test these conditions in a unit test since they're
-        // part of static initialization, but we can document them
-
-        // The actual panic would happen during the first call to any AppPath function
-        // or exe_dir() function when the LazyLock is initialized
-
-        // For testing purposes, we just verify that normal operation works
-        let _config = AppPath::new("config.toml");
-        let _dir = exe_dir();
-
-        // If we reach here, the static initialization succeeded
-        // Test passes by reaching this point without panicking
-    }
-}
+mod tests;

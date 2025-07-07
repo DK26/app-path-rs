@@ -2,7 +2,7 @@
 
 **Create paths relative to your executable for truly portable applications.**
 
-[![Crates.io](https://img.shields.io/crates/v/app-path.svg)](https://crates.io/crates/app-path)
+[![## 🎨 Trait Implementations & Ergonomicsrates.io](https://img.shields.io/crates/v/app-path.svg)](https://crates.io/crates/app-path)
 [![Documentation](https://docs.rs/app-path/badge.svg)](https://docs.rs/app-path)
 [![License: MIT OR Apache-2.0](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue.svg)](LICENSE-MIT)
 [![CI](https://github.com/DK26/app-path-rs/workflows/CI/badge.svg)](https://github.com/DK26/app-path-rs/actions)
@@ -67,7 +67,7 @@ AppPath is built around the core principle of **portable-first design** with the
 - 🌍 **Cross-platform** - Consistent behavior across Windows, Linux, and macOS
 - 🛡️ **Infallible API** - Simple `new()` constructor that panics on rare system failures (with clear documentation of edge cases)
 - 🚀 **Static caching** - Executable location determined once and cached for performance
-- 🔧 **Easy testing** - Override base directory with `with_base()` static method
+- 🔧 **Easy testing** - Use standard path joining for custom layouts
 - 📁 **Smart path handling** - Relative paths resolve to executable directory, absolute paths used as-is
 - ⚡ **Zero allocations** - Accepts `impl AsRef<Path>` to avoid unnecessary allocations
 - 🎯 **Ergonomic conversions** - `From` implementations for all common path types
@@ -95,7 +95,41 @@ AppPath is built around the core principle of **portable-first design** with the
 - Handles root-level executables gracefully
 - Clear failure modes with descriptive error messages
 
-## 📁 Path Resolution Behavior
+## � Trait Implementations & Ergonomics
+
+`AppPath` implements standard traits for seamless integration with Rust APIs:
+
+**Collections & Comparison:**
+- `PartialEq`, `Eq`, `Hash` - Use in `HashMap`, `HashSet`
+- `PartialOrd`, `Ord` - Automatic sorting in `BTreeMap`, `BTreeSet`
+
+**Path Integration:**
+- `AsRef<Path>` - Works with any API expecting `&Path`
+- `Deref<Target=Path>` - Call `Path` methods directly (e.g., `.extension()`)
+- `Borrow<Path>` - Efficient lookups in collections
+
+**Conversions:**
+- `From<T>` for `&str`, `String`, `&Path`, `PathBuf`
+- `Into<PathBuf>` - Convert back to owned `PathBuf`
+- `Clone`, `Debug`, `Display`, `Default`
+
+```rust
+use app_path::AppPath;
+use std::collections::HashMap;
+
+// Works in collections
+let mut files = HashMap::new();
+files.insert(AppPath::new("config.toml"), "Configuration");
+
+// Direct Path methods via Deref
+let config = AppPath::new("config.toml");
+assert_eq!(config.extension(), Some("toml".as_ref()));
+
+// Natural conversions
+let path: AppPath = "data.txt".into();
+```
+
+## �📁 Path Resolution Behavior
 
 `AppPath` handles different path types intelligently:
 
@@ -125,7 +159,7 @@ This design allows your application to:
 Add to your `Cargo.toml`:
 ```toml
 [dependencies]
-app-path = "0.1"
+app-path = "0.1.2"
 ```
 
 ```rust
@@ -155,7 +189,37 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 ```
 
-## 🚨 Panic Conditions & Design Rationale
+## � Additional Helper Functions
+
+### The `exe_dir()` Function
+
+For cases where you need direct access to your executable's directory:
+
+```rust
+use app_path::exe_dir;
+
+fn main() {
+    // Get the directory containing your executable
+    let exe_directory = exe_dir();
+    println!("Executable directory: {}", exe_directory.display());
+    
+    // Use it with standard library functions
+    for entry in std::fs::read_dir(exe_directory).unwrap() {
+        println!("Found: {}", entry.unwrap().path().display());
+    }
+    
+    // Or combine with custom logic
+    let custom_path = exe_directory.join("custom").join("path.txt");
+    println!("Custom path: {}", custom_path.display());
+}
+```
+
+**When to use `exe_dir()` vs `AppPath`:**
+- Use `AppPath::new()` for most file/directory access (recommended)
+- Use `exe_dir()` when you need the raw directory for custom path manipulation
+- Use `exe_dir()` when interfacing with APIs that expect `&Path` directories
+
+## �🚨 Panic Conditions & Design Rationale
 
 AppPath uses an **infallible API** by design. This is a deliberate architectural choice that prioritizes **simplicity and performance** for the common case where executable location determination succeeds (which is the vast majority of real-world usage).
 
@@ -197,79 +261,58 @@ If your application needs to handle executable location failures gracefully:
 
 ```rust
 use app_path::AppPath;
-use std::panic;
+use std::env;
 
-fn safe_app_path(relative_path: &str) -> Option<AppPath> {
-    panic::catch_unwind(|| AppPath::new(relative_path)).ok()
+fn safe_app_path(relative_path: &str) -> AppPath {
+    match env::current_exe() {
+        Ok(exe_path) => {
+            if let Some(exe_dir) = exe_path.parent() {
+                let config_path = exe_dir.join(relative_path);
+                AppPath::new(config_path)
+            } else {
+                // Fallback for edge case where exe has no parent
+                let temp_dir = env::temp_dir().join("myapp");
+                let _ = std::fs::create_dir_all(&temp_dir);
+                let config_path = temp_dir.join(relative_path);
+                AppPath::new(config_path)
+            }
+        }
+        Err(_) => {
+            // Fallback when executable location cannot be determined
+            let temp_dir = env::temp_dir().join("myapp");
+            let _ = std::fs::create_dir_all(&temp_dir);
+            let config_path = temp_dir.join(relative_path);
+            AppPath::new(config_path)
+        }
+    }
 }
 
 // Usage with fallback strategy
-let config = safe_app_path("config.toml").unwrap_or_else(|| {
-    // Fallback strategies:
-    // 1. Use temp directory
-    let temp_dir = std::env::temp_dir().join("myapp");
-    std::fs::create_dir_all(&temp_dir).unwrap();
-    AppPath::with_base(&temp_dir, "config.toml")
-    
-    // 2. Use current directory
-    // AppPath::with_base(".", "config.toml")
-    
-    // 3. Use user home directory
-    // let home = std::env::var("HOME").unwrap_or_else(|_| ".".to_string());
-    // AppPath::with_base(home, ".myapp/config.toml")
-});
+let config = safe_app_path("config.toml");
 ```
 
-### Performance Benefits of This Design
-
-**Static Caching:** Executable location is determined once during static initialization and cached forever:
-- No repeated system calls
-- Thread-safe access to cached value
-- Optimal performance for high-frequency usage
-
-**Zero Allocations:** The `impl AsRef<Path>` design avoids unnecessary allocations:
-- String literals use borrowed data
-- Owned types can be borrowed efficiently
-- No intermediate path conversions
-
-**Minimal Memory:** Each AppPath instance stores only the resolved path:
-- No retention of input paths
-- Compact memory footprint
-- Efficient for applications with many path instances
+**Note:** Using `std::env::current_exe()` directly is simpler and more idiomatic than `panic::catch_unwind` patterns. Most applications should use environment variable fallbacks or conditional patterns instead.
 ```
 
-## ⚡ Performance and Ownership
+## ⚡ Efficient API Design
 
-AppPath is optimized for minimal overhead:
+AppPath is designed for practical, efficient usage:
+
+**Key Design Features:**
+- **Static caching** - Executable location determined once, cached forever
+- **Zero allocations** - String literals and references used efficiently  
+- **Minimal memory** - Only stores the final resolved path
+- **Optimized methods** - Zero-cost abstractions for direct path operations
 
 ```rust
 use app_path::AppPath;
-use std::path::{Path, PathBuf};
 
-// Accepts any AsRef<Path> type - no unnecessary allocations
+// Efficient - no allocations
 let config = AppPath::new("config.toml");          // &str
-
-// Efficient with owned types
-let filename = "data.db".to_string();
-let data = AppPath::new(&filename);                 // &String (no move needed)
-
-let path_buf = PathBuf::from("logs/app.log");
-let logs = AppPath::new(&path_buf);                 // &PathBuf (no move needed)
+let data = AppPath::new(&filename);                 // &String (no move)
 
 // Direct ownership transfer when desired
-let owned_path = PathBuf::from("cache.json");
-let cache: AppPath = owned_path.into();             // PathBuf moved via From trait
-
-// From trait for ergonomic conversions
-let settings: AppPath = "settings.toml".into();     // &str
-let from_string: AppPath = "db.sqlite".to_string().into(); // String
-```
-
-**Key optimizations:**
-- **Static caching** - Executable location determined once and cached
-- **Minimal memory** - Only stores the final resolved path
-- **Zero allocations** - Uses `AsRef<Path>` to avoid unnecessary allocations
-- **Efficient conversions** - `From` trait implementations for all common types
+let cache: AppPath = PathBuf::from("cache.json").into(); // PathBuf moved
 ```
 
 ## 🏗️ Application Structure
@@ -289,7 +332,7 @@ myapp.exe          # Your executable
 
 ## 🧪 Testing Support
 
-Override the base directory for testing:
+Use standard path joining for testing with custom directories:
 
 ```rust
 #[cfg(test)]
@@ -300,7 +343,8 @@ mod tests {
     #[test]
     fn test_config_loading() {
         let temp = env::temp_dir().join("app_path_test");
-        let config = AppPath::with_base(&temp, "config.toml");
+        let config_path = temp.join("config.toml");
+        let config = AppPath::new(config_path);
         
         // Test with isolated temporary directory
         assert!(!config.exists());
@@ -491,16 +535,17 @@ let system_config = AppPath::new("/etc/myapp/config");    // Absolute path prese
 
 ### 5. **Testability by Design**
 
-**Design Choice:** Static `with_base()` method
+**Design Choice:** Simple path joining for testing
 
-**Why:** Enables easy testing without requiring complex mocking or filesystem manipulation.
+**Why:** Enables easy testing without requiring complex methods.
 
 ```rust
 // ✅ Easy testing
 #[test]
 fn test_config_handling() {
     let temp_dir = std::env::temp_dir().join("test");
-    let config = AppPath::with_base(&temp_dir, "config.toml");
+    let config_path = temp_dir.join("config.toml");
+    let config = AppPath::new(config_path);
     // Test in isolation...
 }
 ```
@@ -671,7 +716,8 @@ mod tests {
     #[test]
     fn test_config_creation() {
         let temp_dir = setup_test_env();
-        let config = AppPath::with_base(temp_dir.path(), "config.toml");
+        let config_path = temp_dir.path().join("config.toml");
+        let config = AppPath::new(config_path);
         
         // Test config creation logic
         create_default_config(&config);
@@ -687,16 +733,31 @@ mod tests {
 
 ```rust
 use app_path::AppPath;
+use std::env;
 
 // For applications that need graceful fallbacks
 fn get_config_with_fallback() -> AppPath {
-    std::panic::catch_unwind(|| AppPath::new("config.toml"))
-        .unwrap_or_else(|_| {
+    match env::current_exe() {
+        Ok(exe_path) => {
+            if let Some(exe_dir) = exe_path.parent() {
+                let config_path = exe_dir.join("config.toml");
+                AppPath::new(config_path)
+            } else {
+                eprintln!("Warning: Executable at filesystem root, using temp directory");
+                let temp_config = env::temp_dir().join("myapp");
+                let _ = std::fs::create_dir_all(&temp_config);
+                let config_path = temp_config.join("config.toml");
+                AppPath::new(config_path)
+            }
+        }
+        Err(_) => {
             eprintln!("Warning: Cannot determine executable location, using temp directory");
             let temp_config = env::temp_dir().join("myapp");
-            fs::create_dir_all(&temp_config).unwrap();
-            AppPath::with_base(&temp_config, "config.toml")
-        })
+            let _ = std::fs::create_dir_all(&temp_config);
+            let config_path = temp_config.join("config.toml");
+            AppPath::new(config_path)
+        }
+    }
 }
 
 // For applications that should fail fast
