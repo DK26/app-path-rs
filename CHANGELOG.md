@@ -7,6 +7,61 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0] - 2025-07-07
+
+### BREAKING CHANGES
+- **Replaced `try_new()` with infallible `new()`** - Constructor now panics on system failure instead of returning `Result`
+- **Removed `input()` method and `input_path` field** - No longer stores the original input path for cleaner API
+- **Replaced `TryFrom` with `From` trait implementations** - Conversions are now infallible 
+- **Removed `AppPath::with_base()` method** - This method was confusing and broke the core mental model of "paths relative to executable"
+- **Changed constructor parameter** - Now accepts `impl AsRef<Path>` instead of `impl Into<PathBuf>` for zero-allocation optimization
+
+**Migration Guide:**
+```rust
+// 0.1.2 (old)
+let config = AppPath::try_new("config.toml")?;
+let input_path = config.input(); // No longer available
+let custom = AppPath::with_base(&dir, "file.txt");
+
+// 0.2.0 (new) 
+let config = AppPath::new("config.toml"); // Infallible
+// input_path no longer needed - simplified API
+let custom = AppPath::new(dir.join("file.txt")); // Use standard Path::join
+```
+
+### Added
+- **Infallible API design** - `new()` constructor that panics on rare system failures
+- **Static executable directory caching** - Uses `LazyLock` for optimal performance  
+- Comprehensive trait implementations: `Default`, `PartialEq`, `Eq`, `PartialOrd`, `Ord`, `Hash`, `Deref<Target=Path>`, `Borrow<Path>`
+- Enhanced collection integration - `AppPath` now works seamlessly in `HashMap`, `BTreeSet`, etc.
+- `Default` implementation that points to the executable directory
+- Direct `Path` method access via `Deref` (e.g., `app_path.extension()`)
+- Efficient collection lookups via `Borrow<Path>`
+- Comprehensive error handling examples and fallback patterns
+
+### Enhanced
+- **Simplified API design** - Now focused on the core use case: "paths relative to executable"
+- **Improved testing patterns** - Use standard `Path::join()` for custom test directories
+- **Cleaner documentation** - Removed confusing examples and focused on practical usage
+- **Zero-allocation optimization** - `#[inline]` attributes on all performance-critical methods
+- **Better error handling examples** - Practical fallback patterns using `std::env::current_exe()`
+
+### Performance
+- Static caching of executable directory using `LazyLock` for optimal performance
+- Aggressive inlining of trait implementations and core methods
+- Zero-allocation design for `impl AsRef<Path>` parameters
+
+### Documentation
+- Streamlined README focusing on API usage rather than compiler optimizations
+- Updated all examples to remove `with_base()` references
+- Added comprehensive trait implementation examples
+- Improved cognitive load by removing overly technical explanations
+- Clear migration guide for users of the removed `with_base()` method
+
+### Internal
+- Split tests into dedicated `src/tests.rs` module for better maintainability
+- Improved test organization and coverage
+
 ## [0.1.2] - 2025-07-06
 
 ### Added
@@ -63,7 +118,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added  
 - Initial release (yanked - replaced by 0.1.1 with improved API)
 
-[Unreleased]: https://github.com/DK26/app-path-rs/compare/v0.1.2...HEAD
+[Unreleased]: https://github.com/DK26/app-path-rs/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/DK26/app-path-rs/compare/v0.1.2...v0.2.0
 [0.1.2]: https://github.com/DK26/app-path-rs/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/DK26/app-path-rs/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/DK26/app-path-rs/releases/tag/v0.1.0
