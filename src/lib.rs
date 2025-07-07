@@ -91,14 +91,15 @@
 //! This dual behavior enables applications to be **primarily portable** while still
 //! allowing **system integration** when needed.
 //!
-//! ## Performance Design
+//! ## Performance and Memory Design
 //!
 //! **AppPath** is optimized for high-performance applications:
 //!
-//! - **Static caching**: Executable location determined once, cached forever
+//! - **Static caching**: Executable directory determined once, cached forever
 //! - **Minimal memory**: Only stores the final resolved path (no input path retained)
 //! - **Zero allocations**: Uses `AsRef<Path>` to avoid unnecessary conversions
 //! - **Efficient conversions**: `From` trait implementations for all common types
+//! - **Thread-safe**: Safe concurrent access to cached executable directory
 //!
 //! ```rust
 //! use app_path::AppPath;
@@ -183,15 +184,6 @@
 //! let owned_path = PathBuf::from("important/data.db");
 //! let app_path: AppPath = owned_path.into(); // PathBuf is moved efficiently
 //! ```
-//!
-//! ## Performance
-//!
-//! AppPath is optimized for efficiency:
-//!
-//! - **Cached executable location**: Determined once, reused for all instances
-//! - **Minimal memory usage**: Only stores the final resolved path
-//! - **Zero-copy when possible**: Uses `AsRef<Path>` to avoid unnecessary allocations
-//! - **Efficient ownership transfer**: Moves owned types like `String` and `PathBuf`
 
 use std::env::current_exe;
 use std::path::{Path, PathBuf};
@@ -413,13 +405,17 @@ impl AppPath {
     ///
     /// # Arguments
     ///
-    /// * `path` - A path that will be resolved relative to the executable.
+    /// * `path` - A path that will be resolved according to AppPath's resolution strategy.
     ///   Accepts any type implementing [`AsRef<Path>`]:
     ///   - `&str` - String literals and string slices
     ///   - `String` - Owned strings
     ///   - `&Path` - Path references
     ///   - `PathBuf` - Path buffers
     ///   - And many others that implement `AsRef<Path>`
+    ///
+    ///   **Path Resolution:**
+    ///   - **Relative paths** are resolved relative to the executable directory
+    ///   - **Absolute paths** are used as-is (not modified)
     ///
     /// # Panics
     ///
@@ -651,20 +647,6 @@ impl AppPath {
     ///         AppPath::new("data/app.db")
     ///     }
     /// }
-    /// ```
-    ///
-    /// # Examples
-    ///
-    /// ```rust
-    /// use app_path::AppPath;
-    /// use std::env;
-    ///
-    /// // For testing with a temporary directory
-    /// let temp_dir = env::temp_dir();
-    /// let config = AppPath::with_base(&temp_dir, "config.toml");
-    ///
-    /// // For custom application layouts
-    /// let app_data = AppPath::with_base("/opt/myapp", "data/users.db");
     /// ```
     pub fn with_base(base: impl AsRef<Path>, path: impl AsRef<Path>) -> Self {
         let full_path = base.as_ref().join(path.as_ref());

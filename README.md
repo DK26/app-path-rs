@@ -95,7 +95,7 @@ AppPath is built around the core principle of **portable-first design** with the
 - Handles root-level executables gracefully
 - Clear failure modes with descriptive error messages
 
-## � Path Resolution Behavior
+## 📁 Path Resolution Behavior
 
 `AppPath` handles different path types intelligently:
 
