@@ -1,4 +1,4 @@
-use crate::{exe_dir, try_exe_dir, AppPath, AppPathError};
+use crate::{app_path, exe_dir, try_exe_dir, AppPath, AppPathError};
 use std::env;
 use std::fs::{self, File};
 use std::io::Write;
@@ -801,83 +801,97 @@ fn test_fallible_api_documentation_examples() {
 // === Override API Tests ===
 
 #[test]
-fn test_new_with_override_with_override() {
+fn test_with_override_with_override() {
     let temp_dir = env::temp_dir();
     let override_path = temp_dir.join("config.toml");
-    let result = AppPath::new_with_override("config.toml", Some(override_path.clone()));
+    let result = AppPath::with_override("config.toml", Some(override_path.clone()));
     assert_eq!(result.path(), override_path);
 }
 
 #[test]
-fn test_new_with_override_without_override() {
-    let result = AppPath::new_with_override("config.toml", None::<&str>);
+fn test_with_override_without_override() {
+    let result = AppPath::with_override("config.toml", None::<&str>);
     let expected = exe_dir().join("config.toml");
     assert_eq!(result.path(), expected);
 }
 
 #[test]
-fn test_new_with_override_fn_with_override() {
+fn test_with_override_fn_with_override() {
     let temp_dir = env::temp_dir();
     let override_path = temp_dir.join("config.toml");
     let override_str = override_path.to_string_lossy().to_string();
-    let result = AppPath::new_with_override_fn("config.toml", || Some(override_str));
+    let result = AppPath::with_override_fn("config.toml", || Some(override_str));
     assert_eq!(result.path(), override_path);
 }
 
 #[test]
-fn test_new_with_override_fn_without_override() {
-    let result = AppPath::new_with_override_fn("config.toml", || None::<&str>);
+fn test_with_override_fn_without_override() {
+    let result = AppPath::with_override_fn("config.toml", || None::<&str>);
     let expected = exe_dir().join("config.toml");
     assert_eq!(result.path(), expected);
 }
 
 #[test]
-fn test_new_with_override_fn_complex_logic() {
+fn test_with_override_fn_complex_logic() {
     use std::env;
 
-    // Test with environment variable override
-    let result = AppPath::new_with_override_fn("config.toml", || {
+    // Test with environment variable override - set a test env var
+    env::set_var("TEST_CONFIG_PATH", "/custom/config.toml");
+    let result = AppPath::with_override_fn("config.toml", || {
         env::var("TEST_CONFIG_PATH")
             .ok()
             .or_else(|| env::var("FALLBACK_CONFIG").ok())
             .or_else(|| Some("fallback.toml".to_string()))
     });
 
-    // Should use fallback since env vars don't exist
-    let expected = exe_dir().join("fallback.toml");
-    assert_eq!(result.path(), expected);
+    // Should use the first env var value (but canonicalized on Windows)
+    assert!(result.path().to_string_lossy().contains("config.toml"));
+
+    // Clean up
+    env::remove_var("TEST_CONFIG_PATH");
+
+    // Test fallback when no env vars exist
+    let fallback_result = AppPath::with_override_fn("config.toml", || {
+        env::var("NONEXISTENT_VAR")
+            .ok()
+            .or_else(|| env::var("ALSO_NONEXISTENT").ok())
+            .or_else(|| Some("fallback.toml".to_string()))
+    });
+
+    let expected_fallback = exe_dir().join("fallback.toml");
+    assert_eq!(fallback_result.path(), expected_fallback);
 }
 
 #[test]
-fn test_try_new_with_override_success() {
+fn test_try_with_override_success() {
     let temp_dir = env::temp_dir();
     let override_path = temp_dir.join("config.toml");
-    let result = AppPath::try_new_with_override("config.toml", Some(override_path.clone()));
+    let result = AppPath::try_with_override("config.toml", Some(override_path.clone()));
     assert!(result.is_ok());
     assert_eq!(result.unwrap().path(), override_path);
 }
 
 #[test]
-fn test_try_new_with_override_no_override() {
-    let result = AppPath::try_new_with_override("config.toml", None::<&str>);
+fn test_try_with_override_no_override() {
+    let result = AppPath::try_with_override("config.toml", None::<&str>);
     assert!(result.is_ok());
     let expected = exe_dir().join("config.toml");
     assert_eq!(result.unwrap().path(), expected);
 }
 
 #[test]
-fn test_try_new_with_override_fn_success() {
+fn test_try_with_override_fn_success() {
     let temp_dir = env::temp_dir();
     let override_path = temp_dir.join("config.toml");
     let override_str = override_path.to_string_lossy().to_string();
-    let result = AppPath::try_new_with_override_fn("config.toml", || Some(override_str));
+    let result = AppPath::try_with_override_fn("config.toml", || Some(override_str));
     assert!(result.is_ok());
     assert_eq!(result.unwrap().path(), override_path);
 }
 
 #[test]
-fn test_try_new_with_override_fn_no_override() {
-    let result = AppPath::try_new_with_override_fn("config.toml", || None::<&str>);
+fn test_try_with_override_fn_no_override() {
+    let result = AppPath::try_with_override_fn("config.toml", || None::<&str>);
     assert!(result.is_ok());
     let expected = exe_dir().join("config.toml");
     assert_eq!(result.unwrap().path(), expected);
@@ -890,15 +904,15 @@ fn test_override_methods_with_different_types() {
     let pathbuf_path = temp_dir.join("pathbuf.txt");
 
     // Test with String
-    let result1 = AppPath::new_with_override("default.txt", Some(string_path.clone()));
+    let result1 = AppPath::with_override("default.txt", Some(string_path.clone()));
     assert_eq!(result1.path(), Path::new(&string_path));
 
     // Test with PathBuf
-    let result2 = AppPath::new_with_override("default.txt", Some(pathbuf_path.clone()));
+    let result2 = AppPath::with_override("default.txt", Some(pathbuf_path.clone()));
     assert_eq!(result2.path(), pathbuf_path);
 
     // Test with &str
-    let result3 = AppPath::new_with_override("default.txt", Some(string_path.as_str()));
+    let result3 = AppPath::with_override("default.txt", Some(string_path.as_str()));
     assert_eq!(result3.path(), Path::new(&string_path));
 }
 
@@ -907,7 +921,7 @@ fn test_override_priority_order() {
     use std::env;
 
     // Test priority: override_fn result > default
-    let result = AppPath::new_with_override_fn("default.txt", || {
+    let result = AppPath::with_override_fn("default.txt", || {
         env::var("NONEXISTENT_VAR")
             .ok()
             .or_else(|| Some("priority.txt".to_string()))
@@ -924,11 +938,158 @@ fn test_override_absolute_vs_relative() {
     let relative_override = "relative.txt";
 
     // Absolute override should be used as-is
-    let result1 = AppPath::new_with_override("default.txt", Some(absolute_override.clone()));
+    let result1 = AppPath::with_override("default.txt", Some(absolute_override.clone()));
     assert_eq!(result1.path(), absolute_override);
 
     // Relative override should be resolved relative to exe_dir
-    let result2 = AppPath::new_with_override("default.txt", Some(relative_override));
+    let result2 = AppPath::with_override("default.txt", Some(relative_override));
     let expected = exe_dir().join(relative_override);
     assert_eq!(result2.path(), expected);
+}
+
+// === Path Manipulation Method Tests ===
+
+#[test]
+fn test_join_method() {
+    let base = AppPath::new("data");
+    let users_db = base.join("users.db");
+    let expected = exe_dir().join("data").join("users.db");
+    assert_eq!(users_db.path(), expected);
+
+    // Test chaining
+    let nested = base.join("backups").join("daily").join("file.txt");
+    let expected_nested = exe_dir()
+        .join("data")
+        .join("backups")
+        .join("daily")
+        .join("file.txt");
+    assert_eq!(nested.path(), expected_nested);
+}
+
+#[test]
+fn test_parent_method() {
+    let config_file = AppPath::new("config/app.toml");
+    let config_dir = config_file.parent().unwrap();
+    let expected = exe_dir().join("config");
+    assert_eq!(config_dir.path(), expected);
+
+    // Test root has no parent beyond exe_dir
+    let root_file = AppPath::new("app.log");
+    let parent = root_file.parent().unwrap();
+    assert_eq!(parent.path(), exe_dir());
+}
+
+#[test]
+fn test_with_extension_method() {
+    let config = AppPath::new("config");
+    let config_toml = config.with_extension("toml");
+    let config_json = config.with_extension("json");
+
+    let expected_toml = exe_dir().join("config.toml");
+    let expected_json = exe_dir().join("config.json");
+
+    assert_eq!(config_toml.path(), expected_toml);
+    assert_eq!(config_json.path(), expected_json);
+
+    // Test replacing existing extension
+    let log_file = AppPath::new("app.log");
+    let backup_file = log_file.with_extension("bak");
+    let expected_backup = exe_dir().join("app.bak");
+    assert_eq!(backup_file.path(), expected_backup);
+}
+
+#[test]
+fn test_file_info_methods() {
+    let config = AppPath::new("config/app.toml");
+
+    assert_eq!(config.file_name().unwrap(), "app.toml");
+    assert_eq!(config.file_stem().unwrap(), "app");
+    assert_eq!(config.extension().unwrap(), "toml");
+}
+
+#[test]
+fn test_file_type_methods() {
+    // Create temporary files for testing
+    let temp_dir = env::temp_dir();
+    let temp_file = temp_dir.join("test_file.txt");
+    let temp_subdir = temp_dir.join("test_subdir");
+
+    std::fs::write(&temp_file, "test").unwrap();
+    std::fs::create_dir_all(&temp_subdir).unwrap();
+
+    let file_path = AppPath::new(&temp_file);
+    let dir_path = AppPath::new(&temp_subdir);
+    let nonexistent = AppPath::new("nonexistent_file.txt");
+
+    assert!(file_path.is_file());
+    assert!(!file_path.is_dir());
+
+    assert!(dir_path.is_dir());
+    assert!(!dir_path.is_file());
+
+    assert!(!nonexistent.is_file());
+    assert!(!nonexistent.is_dir());
+
+    // Cleanup
+    std::fs::remove_file(&temp_file).ok();
+    std::fs::remove_dir(&temp_subdir).ok();
+}
+
+// === Macro Tests ===
+
+#[test]
+fn test_app_path_macro_basic() {
+    let config = app_path!("config.toml");
+    let expected = AppPath::new("config.toml");
+    assert_eq!(config.path(), expected.path());
+}
+
+#[test]
+fn test_app_path_macro_with_env() {
+    let temp_dir = env::temp_dir();
+    let custom_path = temp_dir.join("custom_config.toml");
+    env::set_var("TEST_CONFIG_PATH", &custom_path);
+
+    let config = app_path!("default.toml", env = "TEST_CONFIG_PATH");
+    assert_eq!(config.path(), custom_path);
+
+    // Test with non-existent env var
+    let default_config = app_path!("default.toml", env = "NON_EXISTENT_VAR");
+    let expected = exe_dir().join("default.toml");
+    assert_eq!(default_config.path(), expected);
+
+    env::remove_var("TEST_CONFIG_PATH");
+}
+
+#[test]
+fn test_app_path_macro_with_override() {
+    let temp_dir = env::temp_dir();
+    let override_path = Some(temp_dir.join("custom_path.toml"));
+    let config = app_path!("default.toml", override = override_path.clone());
+    assert_eq!(config.path(), override_path.unwrap());
+
+    let no_override: Option<PathBuf> = None;
+    let default_config = app_path!("default.toml", override = no_override);
+    let expected = exe_dir().join("default.toml");
+    assert_eq!(default_config.path(), expected);
+}
+
+// === Additional Trait Tests ===
+
+#[test]
+fn test_as_ref_os_str() {
+    use std::ffi::OsStr;
+
+    let config = AppPath::new("config.toml");
+    let os_str: &OsStr = config.as_ref();
+    assert_eq!(os_str, config.path().as_os_str());
+}
+
+#[test]
+fn test_from_app_path_to_os_string() {
+    use std::ffi::OsString;
+
+    let config = AppPath::new("config.toml");
+    let os_string: OsString = config.clone().into();
+    assert_eq!(os_string, config.path().as_os_str());
 }

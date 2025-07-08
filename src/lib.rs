@@ -33,7 +33,7 @@
 //!
 //! - [`AppPath::new()`] - **Recommended**: Simple, infallible constructor
 //! - [`AppPath::try_new()`] - **Libraries**: Fallible version for error handling
-//! - [`AppPath::new_with_override()`] - **Deployment**: Environment-configurable paths
+//! - [`AppPath::with_override()`] - **Deployment**: Environment-configurable paths
 //! - [`exe_dir()`] - **Advanced**: Direct access to executable directory
 //!
 //! ## Panic Conditions
@@ -56,3 +56,42 @@ mod tests;
 pub use app_path::AppPath;
 pub use error::AppPathError;
 pub use functions::{exe_dir, try_exe_dir};
+
+/// Convenience macro for creating `AppPath` instances with optional environment variable overrides.
+///
+/// This macro provides a more ergonomic way to create `AppPath` instances, especially when
+/// dealing with environment variable overrides.
+///
+/// # Syntax
+///
+/// - `app_path!(path)` - Simple path creation (equivalent to `AppPath::new(path)`)
+/// - `app_path!(path, env = "VAR_NAME")` - With environment variable override
+/// - `app_path!(path, override = expression)` - With any optional override expression
+///
+/// # Examples
+///
+/// ```rust
+/// use app_path::{app_path, AppPath};
+///
+/// // Simple usage
+/// let config = app_path!("config.toml");
+/// assert_eq!(config.file_name().unwrap(), "config.toml");
+///
+/// // Environment variable override
+/// let data_dir = app_path!("data", env = "DATA_DIR");
+///
+/// // Custom override expression
+/// let log_file = app_path!("app.log", override = std::env::args().nth(1));
+/// ```
+#[macro_export]
+macro_rules! app_path {
+    ($path:expr) => {
+        $crate::AppPath::new($path)
+    };
+    ($path:expr, env = $env_var:expr) => {
+        $crate::AppPath::with_override($path, std::env::var($env_var).ok())
+    };
+    ($path:expr, override = $override_expr:expr) => {
+        $crate::AppPath::with_override($path, $override_expr)
+    };
+}

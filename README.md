@@ -107,12 +107,12 @@ use std::env;
 // Development: override via environment variables
 // Testing: override via CLI arguments
 
-let config = AppPath::new_with_override(
+let config = AppPath::with_override(
     "config.toml",
     env::var("APP_CONFIG").ok()
 );
 
-let data_dir = AppPath::new_with_override_fn("data", || {
+let data_dir = AppPath::with_override_fn("data", || {
     env::var("DATA_DIR").ok()
         .or_else(|| env::var("TMPDIR").map(|tmp| format!("{}/myapp", tmp)))
 });
@@ -134,7 +134,7 @@ AppPath panics only on system-level failures (determining executable location). 
 use app_path::AppPath;
 
 // Recommended: Use override API for environment variables
-let config = AppPath::new_with_override(
+let config = AppPath::with_override(
     "config.toml",
     env::var("APP_CONFIG").ok()
 );

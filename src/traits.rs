@@ -262,3 +262,43 @@ impl Borrow<Path> for AppPath {
         self.path()
     }
 }
+
+// === Additional Conversion Traits ===
+
+impl AsRef<std::ffi::OsStr> for AppPath {
+    /// Converts `AppPath` to `&OsStr` for FFI operations.
+    ///
+    /// This is useful when interfacing with operating system APIs that require `OsStr`.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use app_path::AppPath;
+    /// use std::ffi::OsStr;
+    ///
+    /// let config = AppPath::new("config.toml");
+    /// let os_str: &OsStr = config.as_ref();
+    /// ```
+    #[inline]
+    fn as_ref(&self) -> &std::ffi::OsStr {
+        self.path().as_os_str()
+    }
+}
+
+impl From<AppPath> for std::ffi::OsString {
+    /// Converts `AppPath` to `OsString` for owned FFI operations.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use app_path::AppPath;
+    /// use std::ffi::OsString;
+    ///
+    /// let config = AppPath::new("config.toml");
+    /// let os_string: OsString = config.into();
+    /// ```
+    #[inline]
+    fn from(app_path: AppPath) -> Self {
+        app_path.path().as_os_str().to_os_string()
+    }
+}

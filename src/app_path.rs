@@ -21,7 +21,7 @@ use crate::functions::try_exe_dir;
 ///
 /// - [`new()`] - **Primary API**: Simple, infallible construction
 /// - [`try_new()`] - **Libraries**: Fallible version for error handling  
-/// - [`new_with_override()`] - **Deployment**: Environment-configurable paths
+/// - [`with_override()`] - **Deployment**: Environment-configurable paths
 /// - [`path()`] - **Access**: Get the resolved `&Path`
 ///
 /// # Panics
@@ -49,7 +49,7 @@ use crate::functions::try_exe_dir;
 /// let system = AppPath::new("/var/log/app.log");     // → /var/log/app.log
 ///
 /// // Override for deployment flexibility
-/// let config = AppPath::new_with_override(
+/// let config = AppPath::with_override(
 ///     "config.toml",
 ///     std::env::var("CONFIG_PATH").ok()
 /// );
@@ -178,7 +178,7 @@ impl AppPath {
     ///
     /// // Better: Use override API for environment variables
     /// fn load_config_with_override() -> Result<String, AppPathError> {
-    ///     let config_path = AppPath::try_new_with_override(
+    ///     let config_path = AppPath::try_with_override(
     ///         "config.toml",
     ///         std::env::var("APP_CONFIG").ok()
     ///     )?;
@@ -188,7 +188,7 @@ impl AppPath {
     ///
     /// // Multiple environment variable fallback (better approach)
     /// fn get_config_with_fallback() -> Result<AppPath, AppPathError> {
-    ///     AppPath::try_new_with_override_fn("config.toml", || {
+    ///     AppPath::try_with_override_fn("config.toml", || {
     ///         std::env::var("APP_CONFIG").ok()
     ///             .or_else(|| std::env::var("CONFIG_FILE").ok())
     ///             .or_else(|| std::env::var("XDG_CONFIG_HOME").ok().map(|dir| format!("{}/myapp/config.toml", dir)))
@@ -209,12 +209,12 @@ impl AppPath {
     ///
     /// // Use our override API for environment variables (recommended)
     /// fn get_config_path() -> AppPath {
-    ///     AppPath::new_with_override("config.toml", env::var("MYAPP_CONFIG_DIR").ok())
+    ///     AppPath::with_override("config.toml", env::var("MYAPP_CONFIG_DIR").ok())
     /// }
     ///
     /// // Or fallible version for libraries
     /// fn try_get_config_path() -> Result<AppPath, app_path::AppPathError> {
-    ///     AppPath::try_new_with_override("config.toml", env::var("MYAPP_CONFIG_DIR").ok())
+    ///     AppPath::try_with_override("config.toml", env::var("MYAPP_CONFIG_DIR").ok())
     /// }
     /// ```
     ///
@@ -390,14 +390,14 @@ impl AppPath {
     /// use std::env;
     ///
     /// // Environment variable override
-    /// let config = AppPath::new_with_override(
+    /// let config = AppPath::with_override(
     ///     "config.toml",
     ///     env::var("APP_CONFIG").ok()
     /// );
     ///
     /// // CLI argument override
     /// fn get_config(cli_override: Option<&str>) -> AppPath {
-    ///     AppPath::new_with_override("config.toml", cli_override)
+    ///     AppPath::with_override("config.toml", cli_override)
     /// }
     ///
     /// // Configuration file override
@@ -406,11 +406,11 @@ impl AppPath {
     /// }
     ///
     /// let config = load_config();
-    /// let data_dir = AppPath::new_with_override("data", config.data_dir.as_deref());
+    /// let data_dir = AppPath::with_override("data", config.data_dir.as_deref());
     /// # fn load_config() -> Config { Config { data_dir: None } }
     /// ```
     /// ```
-    pub fn new_with_override(
+    pub fn with_override(
         default: impl AsRef<Path>,
         override_option: Option<impl AsRef<Path>>,
     ) -> Self {
@@ -432,7 +432,7 @@ impl AppPath {
     /// use std::env;
     ///
     /// // Multiple fallback sources
-    /// let config = AppPath::new_with_override_fn("config.toml", || {
+    /// let config = AppPath::with_override_fn("config.toml", || {
     ///     env::var("APP_CONFIG").ok()
     ///         .or_else(|| env::var("CONFIG_FILE").ok())
     ///         .or_else(|| {
@@ -446,7 +446,7 @@ impl AppPath {
     /// });
     ///
     /// // Development mode override
-    /// let data_dir = AppPath::new_with_override_fn("data", || {
+    /// let data_dir = AppPath::with_override_fn("data", || {
     ///     if env::var("DEVELOPMENT").is_ok() {
     ///         Some("dev_data".to_string())
     ///     } else {
@@ -454,7 +454,7 @@ impl AppPath {
     ///     }
     /// });
     /// ```
-    pub fn new_with_override_fn<F, P>(default: impl AsRef<Path>, override_fn: F) -> Self
+    pub fn with_override_fn<F, P>(default: impl AsRef<Path>, override_fn: F) -> Self
     where
         F: FnOnce() -> Option<P>,
         P: AsRef<Path>,
@@ -467,7 +467,7 @@ impl AppPath {
 
     /// Creates a path with override support (fallible).
     ///
-    /// **Fallible version of [`new_with_override()`].** Most applications should use the
+    /// **Fallible version of [`with_override()`].** Most applications should use the
     /// infallible version instead for cleaner code.
     ///
     /// # Examples
@@ -477,7 +477,7 @@ impl AppPath {
     /// use std::env;
     ///
     /// fn get_config() -> Result<AppPath, AppPathError> {
-    ///     AppPath::try_new_with_override("config.toml", env::var("CONFIG").ok())
+    ///     AppPath::try_with_override("config.toml", env::var("CONFIG").ok())
     /// }
     /// ```
     /// cleaner, more idiomatic code.
@@ -510,7 +510,7 @@ impl AppPath {
     ///
     /// fn create_config_path() -> Result<AppPath, AppPathError> {
     ///     let config_override = env::var("MYAPP_CONFIG").ok();
-    ///     AppPath::try_new_with_override("config.toml", config_override.as_deref())
+    ///     AppPath::try_with_override("config.toml", config_override.as_deref())
     /// }
     /// ```
     ///
@@ -520,12 +520,12 @@ impl AppPath {
     /// use app_path::{AppPath, AppPathError};
     ///
     /// fn setup_paths(config_override: Option<&str>) -> Result<(AppPath, AppPath), AppPathError> {
-    ///     let config = AppPath::try_new_with_override("config.toml", config_override)?;
-    ///     let data = AppPath::try_new_with_override("data", None::<&str>)?;
+    ///     let config = AppPath::try_with_override("config.toml", config_override)?;
+    ///     let data = AppPath::try_with_override("data", None::<&str>)?;
     ///     Ok((config, data))
     /// }
     /// ```
-    pub fn try_new_with_override(
+    pub fn try_with_override(
         default: impl AsRef<Path>,
         override_option: Option<impl AsRef<Path>>,
     ) -> Result<Self, AppPathError> {
@@ -537,10 +537,10 @@ impl AppPath {
 
     /// Creates a path with dynamic override support (fallible).
     ///
-    /// This is the fallible version of [`AppPath::new_with_override_fn()`]. Use this method
+    /// This is the fallible version of [`AppPath::with_override_fn()`]. Use this method
     /// when you need explicit error handling combined with dynamic override logic.
     ///
-    /// **Most applications should use [`AppPath::new_with_override_fn()`] instead** for
+    /// **Most applications should use [`AppPath::with_override_fn()`] instead** for
     /// cleaner, more idiomatic code.
     ///
     /// ## When to Use This Method
@@ -570,7 +570,7 @@ impl AppPath {
     /// use std::env;
     ///
     /// fn create_data_path() -> Result<AppPath, AppPathError> {
-    ///     AppPath::try_new_with_override_fn("data", || {
+    ///     AppPath::try_with_override_fn("data", || {
     ///         // Complex override logic with multiple sources
     ///         env::var("DATA_DIR").ok()
     ///             .or_else(|| env::var("MYAPP_DATA_DIR").ok())
@@ -591,7 +591,7 @@ impl AppPath {
     /// use app_path::{AppPath, AppPathError};
     ///
     /// fn setup_logging() -> Result<AppPath, AppPathError> {
-    ///     AppPath::try_new_with_override_fn("logs/app.log", || {
+    ///     AppPath::try_with_override_fn("logs/app.log", || {
     ///         // Dynamic override based on multiple conditions
     ///         if std::env::var("SYSLOG").is_ok() {
     ///             Some("/var/log/myapp.log".to_string())
@@ -603,7 +603,7 @@ impl AppPath {
     ///     })
     /// }
     /// ```
-    pub fn try_new_with_override_fn<F, P>(
+    pub fn try_with_override_fn<F, P>(
         default: impl AsRef<Path>,
         override_fn: F,
     ) -> Result<Self, AppPathError>
@@ -615,5 +615,160 @@ impl AppPath {
             Some(override_path) => Self::try_new(override_path),
             None => Self::try_new(default),
         }
+    }
+
+    /// Joins additional path segments to create a new AppPath.
+    ///
+    /// This creates a new `AppPath` by joining the current path with additional segments.
+    /// The new path inherits the same resolution behavior as the original.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use app_path::AppPath;
+    ///
+    /// let data_dir = AppPath::new("data");
+    /// let users_db = data_dir.join("users.db");
+    /// let backups = data_dir.join("backups").join("daily");
+    ///
+    /// // Chain operations for complex paths
+    /// let log_file = AppPath::new("logs")
+    ///     .join("2024")
+    ///     .join("app.log");
+    /// ```
+    #[inline]
+    pub fn join(&self, path: impl AsRef<Path>) -> Self {
+        Self::new(self.full_path.join(path))
+    }
+
+    /// Returns the parent directory as an AppPath, if it exists.
+    ///
+    /// Returns `None` if this path is a root directory or has no parent.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use app_path::AppPath;
+    ///
+    /// let config = AppPath::new("config/app.toml");
+    /// let config_dir = config.parent().unwrap();
+    /// 
+    /// let logs_dir = AppPath::new("logs");
+    /// let app_dir = logs_dir.parent(); // Points to exe directory
+    /// ```
+    #[inline]
+    pub fn parent(&self) -> Option<Self> {
+        self.full_path.parent().map(Self::new)
+    }
+
+    /// Creates a new AppPath with the specified file extension.
+    ///
+    /// If the path has an existing extension, it will be replaced.
+    /// If no extension exists, the new extension will be added.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use app_path::AppPath;
+    ///
+    /// let config = AppPath::new("config");
+    /// let config_toml = config.with_extension("toml");
+    /// let config_json = config.with_extension("json");
+    ///
+    /// let log_file = AppPath::new("app.log");
+    /// let backup_file = log_file.with_extension("bak");
+    /// ```
+    #[inline]
+    pub fn with_extension(&self, ext: &str) -> Self {
+        Self::new(self.full_path.with_extension(ext))
+    }
+
+    /// Returns the file name of this path as an `OsStr`, if it exists.
+    ///
+    /// This is a convenience method that delegates to the underlying `Path`.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use app_path::AppPath;
+    ///
+    /// let config = AppPath::new("config/app.toml");
+    /// assert_eq!(config.file_name().unwrap(), "app.toml");
+    /// ```
+    #[inline]
+    pub fn file_name(&self) -> Option<&std::ffi::OsStr> {
+        self.full_path.file_name()
+    }
+
+    /// Returns the file stem of this path as an `OsStr`, if it exists.
+    ///
+    /// This is a convenience method that delegates to the underlying `Path`.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use app_path::AppPath;
+    ///
+    /// let config = AppPath::new("config/app.toml");
+    /// assert_eq!(config.file_stem().unwrap(), "app");
+    /// ```
+    #[inline]
+    pub fn file_stem(&self) -> Option<&std::ffi::OsStr> {
+        self.full_path.file_stem()
+    }
+
+    /// Returns the extension of this path as an `OsStr`, if it exists.
+    ///
+    /// This is a convenience method that delegates to the underlying `Path`.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use app_path::AppPath;
+    ///
+    /// let config = AppPath::new("config/app.toml");
+    /// assert_eq!(config.extension().unwrap(), "toml");
+    /// ```
+    #[inline]
+    pub fn extension(&self) -> Option<&std::ffi::OsStr> {
+        self.full_path.extension()
+    }
+
+    /// Returns `true` if this path points to a directory.
+    ///
+    /// This is a convenience method that delegates to the underlying `Path`.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use app_path::AppPath;
+    ///
+    /// let data_dir = AppPath::new("data");
+    /// if data_dir.is_dir() {
+    ///     println!("Data directory exists");
+    /// }
+    /// ```
+    #[inline]
+    pub fn is_dir(&self) -> bool {
+        self.full_path.is_dir()
+    }
+
+    /// Returns `true` if this path points to a regular file.
+    ///
+    /// This is a convenience method that delegates to the underlying `Path`.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use app_path::AppPath;
+    ///
+    /// let config = AppPath::new("config.toml");
+    /// if config.is_file() {
+    ///     println!("Config file exists");
+    /// }
+    /// ```
+    #[inline]
+    pub fn is_file(&self) -> bool {
+        self.full_path.is_file()
     }
 }
