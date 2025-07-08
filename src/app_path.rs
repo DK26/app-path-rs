@@ -19,10 +19,10 @@ use crate::functions::try_exe_dir;
 ///
 /// ## API Overview
 ///
-/// - [`new()`] - **Primary API**: Simple, infallible construction
-/// - [`try_new()`] - **Libraries**: Fallible version for error handling  
-/// - [`with_override()`] - **Deployment**: Environment-configurable paths
-/// - [`path()`] - **Access**: Get the resolved `&Path`
+/// - [`Self::new()`] - **Primary API**: Simple, infallible construction
+/// - [`Self::try_new()`] - **Libraries**: Fallible version for error handling  
+/// - [`Self::with_override()`] - **Deployment**: Environment-configurable paths
+/// - [`Self::path()`] - **Access**: Get the resolved `&Path`
 ///
 /// # Panics
 ///
@@ -151,7 +151,7 @@ impl AppPath {
     /// Creates file paths relative to the executable location (fallible).
     ///
     /// **Use this only for libraries or specialized applications requiring explicit error handling.**
-    /// Most applications should use [`new()`] instead for simpler, cleaner code.
+    /// Most applications should use [`Self::new()`] instead for simpler, cleaner code.
     ///
     /// ## When to Use
     ///
@@ -160,7 +160,7 @@ impl AppPath {
     /// - System tools with fallback strategies
     /// - Applications running in unusual environments
     ///
-    /// **Use [`new()`] for:**
+    /// **Use [`Self::new()`] for:**
     /// - Desktop, web, server, CLI applications
     /// - When you want simple, clean code (recommended)
     ///
@@ -409,7 +409,6 @@ impl AppPath {
     /// let data_dir = AppPath::with_override("data", config.data_dir.as_deref());
     /// # fn load_config() -> Config { Config { data_dir: None } }
     /// ```
-    /// ```
     pub fn with_override(
         default: impl AsRef<Path>,
         override_option: Option<impl AsRef<Path>>,
@@ -467,7 +466,7 @@ impl AppPath {
 
     /// Creates a path with override support (fallible).
     ///
-    /// **Fallible version of [`with_override()`].** Most applications should use the
+    /// **Fallible version of [`Self::with_override()`].** Most applications should use the
     /// infallible version instead for cleaner code.
     ///
     /// # Examples
