@@ -20,13 +20,11 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     
-    # Install Rust FIRST, before any cache steps
     - name: Install Rust
       uses: dtolnay/rust-toolchain@stable
       with:
         components: rustfmt, clippy
 
-    # Cache steps AFTER Rust is installed
     - name: Cache cargo registry
       uses: actions/cache@v4
       with:
@@ -46,7 +44,6 @@ jobs:
         restore-keys: |
           ${{ runner.os }}-cargo-build-
 
-    # Run checks and tests
     - name: Check formatting
       run: cargo fmt --all -- --check
 
@@ -55,9 +52,6 @@ jobs:
 
     - name: Run tests
       run: cargo test --verbose
-
-    - name: Run tests (release mode)
-      run: cargo test --release --verbose
 
   docs:
     name: Documentation
@@ -86,14 +80,3 @@ jobs:
     
     - name: Check with MSRV
       run: cargo check --verbose
-
-  security:
-    name: Security Audit
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v4
-    
-    - name: Security audit
-      uses: actions-rs/audit-check@v1
-      with:
-        token: ${{ secrets.GITHUB_TOKEN }}

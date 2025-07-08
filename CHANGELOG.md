@@ -25,12 +25,20 @@ let custom = AppPath::with_base(&dir, "file.txt");
 
 // 0.2.0 (new) 
 let config = AppPath::new("config.toml"); // Infallible
+// OR for error handling:
+let config = AppPath::try_new("config.toml")?; // Fallible
 // input_path no longer needed - simplified API
 let custom = AppPath::new(dir.join("file.txt")); // Use standard Path::join
+
+// Global functions
+let exe_dir = exe_dir(); // Infallible
+// OR for error handling:
+let exe_dir = try_exe_dir()?; // Fallible
 ```
 
 ### Added
 - **Infallible API design** - `new()` constructor that panics on rare system failures
+- **Fallible API design** - `try_new()` constructor and `try_exe_dir()` function for explicit error handling
 - **Static executable directory caching** - Uses `OnceLock` for optimal performance  
 - Comprehensive trait implementations: `Default`, `PartialEq`, `Eq`, `PartialOrd`, `Ord`, `Hash`, `Deref<Target=Path>`, `Borrow<Path>`
 - Enhanced collection integration - `AppPath` now works seamlessly in `HashMap`, `BTreeSet`, etc.
@@ -38,6 +46,7 @@ let custom = AppPath::new(dir.join("file.txt")); // Use standard Path::join
 - Direct `Path` method access via `Deref` (e.g., `app_path.extension()`)
 - Efficient collection lookups via `Borrow<Path>`
 - Comprehensive error handling examples and fallback patterns
+- `AppPathError` enum with descriptive error messages for system failures
 
 ### Enhanced
 - **Simplified API design** - Now focused on the core use case: "paths relative to executable"
