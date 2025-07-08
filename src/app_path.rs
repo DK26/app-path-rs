@@ -648,13 +648,12 @@ impl AppPath {
     /// # Examples
     ///
     /// ```rust
-    /// use app_path::AppPath;
-    ///
+    /// use app_path::AppPath;    ///
     /// let config = AppPath::new("config/app.toml");
     /// let config_dir = config.parent().unwrap();
-    /// 
+    ///
     /// let logs_dir = AppPath::new("logs");
-    /// let app_dir = logs_dir.parent(); // Points to exe directory
+    /// let _app_dir = logs_dir.parent(); // Points to exe directory
     /// ```
     #[inline]
     pub fn parent(&self) -> Option<Self> {
