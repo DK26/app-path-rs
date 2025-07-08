@@ -1064,9 +1064,9 @@ fn test_app_path_macro_with_env() {
 #[test]
 fn test_app_path_macro_with_override() {
     let temp_dir = env::temp_dir();
-    let override_path = Some(temp_dir.join("custom_path.toml"));
-    let config = app_path!("default.toml", override = override_path.clone());
-    assert_eq!(config.path(), override_path.unwrap());
+    let override_path = temp_dir.join("custom_path.toml");
+    let config = app_path!("default.toml", override = Some(override_path.clone()));
+    assert_eq!(config.path(), override_path);
 
     let no_override: Option<PathBuf> = None;
     let default_config = app_path!("default.toml", override = no_override);
