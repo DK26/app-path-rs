@@ -1257,11 +1257,20 @@ fn test_from_app_path_to_os_string() {
 #[test]
 fn test_windows_separator_handling() {
     let windows = AppPath::new(r"C:\temp\config.toml");
+    
     if cfg!(windows) {
         // On Windows, this should be treated as an absolute path
         assert_eq!(windows.path(), Path::new(r"C:\temp\config.toml"));
+        assert!(windows.path().is_absolute());
+        // Also verify the file name is correct
+        assert_eq!(windows.path().file_name(), Some("config.toml".as_ref()));
     } else {
-        // On non-Windows, it's treated as a relative path, so just check the file name
+        // On non-Windows, it's treated as a relative path
+        assert!(!windows.path().is_absolute());
+        // The path should be relative to exe_dir and contain the Windows-style path as a filename
+        let expected_relative = exe_dir().join(r"C:\temp\config.toml");
+        assert_eq!(windows.path(), expected_relative);
+        // File name should be the last component
         assert_eq!(windows.path().file_name(), Some("config.toml".as_ref()));
     }
 }
