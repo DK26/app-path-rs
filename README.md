@@ -20,6 +20,31 @@ let database = AppPath::new("data/users.db");
 if config.exists() {
     let content = std::fs::read_to_string(&config)?;
 }
+
+// Create directories with clear intent
+database.ensure_parent_dirs()?; // Creates data/ directory for the file
+```
+
+## Quick Start
+
+```rust
+use app_path::AppPath;
+
+// Basic usage - files relative to your executable
+let config = AppPath::new("config.toml");
+let data_dir = AppPath::new("data");
+
+// Check if files exist
+if config.exists() {
+    println!("Found config at: {}", config.display());
+}
+
+// Create directories as needed
+data_dir.ensure_dir_exists()?; // Creates data/ directory
+
+// Works with all standard path operations
+let log_file = AppPath::new("logs").join("app.log");
+log_file.ensure_parent_dirs()?; // Creates logs/ directory (parent of file)
 ```
 
 ## Why Choose AppPath?
@@ -61,17 +86,17 @@ fn load_config() -> Result<Config, Box<dyn std::error::Error>> {
 use app_path::AppPath;
 
 fn generate_from_template(name: &str) -> Result<(), Box<dyn std::error::Error>> {
-    let template = AppPath::new("templates").join(format!("{}.hbs", name));
+    let template = AppPath::new("templates").join(format!("{name}.hbs"));
     let output = AppPath::new("output").join("generated.html");
     
     // Ensure output directory exists
-    output.create_dir_all()?;
+    output.ensure_parent_dirs()?; // Creates output/ directory (parent of file)
     
     let template_content = std::fs::read_to_string(&template)?;
     let result = render_template(&template_content)?;
     std::fs::write(&output, result)?;
     
-    println!("Generated: {}", output);
+    println!("Generated: {output}");
     Ok(())
 }
 ```
@@ -82,7 +107,7 @@ use app_path::AppPath;
 
 fn setup_logging() -> Result<(), Box<dyn std::error::Error>> {
     let log_file = AppPath::new("logs/app.log");
-    log_file.create_dir_all()?; // Creates logs/ directory
+    log_file.ensure_parent_dirs()?; // Creates logs/ directory
     
     // Use with any logging framework
     let file = std::fs::OpenOptions::new()
@@ -103,19 +128,23 @@ Deploy the same binary with different configurations:
 use app_path::AppPath;
 use std::env;
 
-// Production: uses default paths
-// Development: override via environment variables
-// Testing: override via CLI arguments
-
+// Use environment variable if available, fallback to default
 let config = AppPath::with_override(
     "config.toml",
     env::var("APP_CONFIG").ok()
 );
 
+// Support multiple environment variables with priority
 let data_dir = AppPath::with_override_fn("data", || {
-    env::var("DATA_DIR").ok()
-        .or_else(|| env::var("TMPDIR").map(|tmp| format!("{}/myapp", tmp)))
+    env::var("DATA_DIR")
+        .or_else(|_| env::var("XDG_DATA_HOME"))
+        .ok()
 });
+
+// Example usage in different environments:
+// Production:   APP_CONFIG not set → uses "./config.toml"
+// Development:  APP_CONFIG="/dev/config.toml" → uses absolute path
+// CI/Testing:   DATA_DIR="/tmp/test-data" → uses custom location
 ```
 
 ## Path Resolution
@@ -125,6 +154,48 @@ let data_dir = AppPath::with_override_fn("data", || {
 
 This enables both portable deployment and system integration.
 
+## Directory Creation
+
+AppPath provides clear, intuitive methods for directory creation:
+
+```rust
+use app_path::AppPath;
+
+// For files: create parent directories
+let config_file = AppPath::new("config/app.toml");
+config_file.ensure_parent_dirs()?; // Creates config/ directory
+std::fs::write(&config_file, "key = value")?;
+
+// For directories: create the directory itself
+let cache_dir = AppPath::new("cache");
+cache_dir.ensure_dir_exists()?; // Creates cache/ directory
+let data_file = cache_dir.join("data.json");
+```
+
+**Method Guide:**
+- `ensure_parent_dirs()` - Creates parent directories for file paths
+- `ensure_dir_exists()` - Creates the path as a directory
+
+*Note: `create_dir_all()` is deprecated. Use the methods above for clearer intent.*
+
+## Ergonomic Macro
+
+The `app_path!` macro provides clean syntax for common patterns:
+
+```rust
+use app_path::app_path;
+
+// Simple paths
+let config = app_path!("config.toml");
+let data = app_path!("data/users.db");
+
+// Environment variable override
+let config = app_path!("config.toml", env = "APP_CONFIG");
+
+// Custom override
+let logs = app_path!("logs", override = custom_log_dir);
+```
+
 ## Error Handling
 
 AppPath panics only on system-level failures (determining executable location). This is extremely rare and indicates unrecoverable system issues.
@@ -133,14 +204,30 @@ AppPath panics only on system-level failures (determining executable location). 
 ```rust
 use app_path::AppPath;
 
-// Recommended: Use override API for environment variables
-let config = AppPath::with_override(
+let config = AppPath::try_new("config.toml")?;
+
+let config = AppPath::try_with_override(
     "config.toml",
     env::var("APP_CONFIG").ok()
-);
+)?;
+```
 
-// Alternative: Direct try_new() for unusual cases
+### Fallible API (For Libraries)
+```rust
+use app_path::{AppPath, AppPathError};
+
+// Handle potential errors explicitly
 let config = AppPath::try_new("config.toml")?;
+
+match AppPath::try_new("config.toml") {
+    Ok(path) => println!("Config: {}", path.display()),
+    Err(AppPathError::ExecutableNotFound(msg)) => {
+        eprintln!("Cannot find executable: {}", msg);
+    }
+    Err(AppPathError::InvalidExecutablePath(msg)) => {
+        eprintln!("Invalid executable path: {}", msg);
+    }
+}
 ```
 
 ## Features

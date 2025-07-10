@@ -30,8 +30,7 @@ use crate::functions::try_exe_dir;
 /// After first successful call, methods never panic (uses cached result).
 ///
 /// # Examples
-///
-/// ```rust
+/// /// ```rust
 /// use app_path::AppPath;
 ///
 /// // Basic usage - most common pattern
@@ -42,7 +41,7 @@ use crate::functions::try_exe_dir;
 /// if config.exists() {
 ///     let content = std::fs::read_to_string(&config);
 /// }
-/// data.create_dir_all(); // Creates data/ directory
+/// data.ensure_parent_dirs(); // Creates data/ directory for the file
 ///
 /// // Mixed portable and system paths
 /// let portable = AppPath::new("app.conf");           // → exe_dir/app.conf
@@ -102,7 +101,7 @@ impl AppPath {
     /// if config.exists() {
     ///     let content = std::fs::read_to_string(&config);
     /// }
-    /// data.create_dir_all(); // Creates data/ directory
+    /// data.ensure_parent_dirs(); // Creates data/ directory for the file
     /// ```
     ///
     /// # Panics
@@ -139,8 +138,9 @@ impl AppPath {
     /// if config.exists() {
     ///     let content = std::fs::read_to_string(&config);
     /// }
-    /// data.create_dir_all(); // Creates data/ directory
+    /// data.ensure_parent_dirs(); // Creates data/ directory for the file
     /// ```
+    #[inline]
     pub fn new(path: impl AsRef<Path>) -> Self {
         match Self::try_new(path) {
             Ok(app_path) => app_path,
@@ -274,6 +274,7 @@ impl AppPath {
     ///     Ok(())
     /// }
     /// ```
+    #[inline]
     pub fn try_new(path: impl AsRef<Path>) -> Result<Self, AppPathError> {
         let exe_dir = try_exe_dir()?;
         let input_path = path.as_ref();
@@ -331,10 +332,13 @@ impl AppPath {
         self.full_path.exists()
     }
 
-    /// Create parent directories if they don't exist.
+    /// Creates parent directories needed for this file path.
     ///
-    /// This is equivalent to calling [`std::fs::create_dir_all`] on the
-    /// parent directory of this path.
+    /// This method creates all parent directories for a file path, making it ready
+    /// for file creation. It does not create the file itself.
+    ///
+    /// **Use this when you know the path represents a file and you want to prepare
+    /// the directory structure for writing the file.**
     ///
     /// # Examples
     ///
@@ -342,20 +346,102 @@ impl AppPath {
     /// use app_path::AppPath;
     /// use std::env;
     ///
-    /// // Use a temporary directory for the example
     /// let temp_dir = env::temp_dir().join("app_path_example");
-    /// let data_file_path = temp_dir.join("data/users/profile.json");
-    /// let data_file = AppPath::new(data_file_path);
     ///
-    /// // Ensure the "data/users" directory exists
-    /// data_file.create_dir_all()?;
+    /// // Prepare directories for a config file
+    /// let config_file = AppPath::new(temp_dir.join("config/app.toml"));
+    /// config_file.ensure_parent_dirs()?; // Creates config/ directory
     ///
-    /// // Verify the directory was created
-    /// assert!(data_file.path().parent().unwrap().exists());
+    /// // Now you can write the file
+    /// std::fs::write(config_file.path(), "key = value")?;
+    /// assert!(config_file.exists());
+    ///
+    /// // Prepare directories for a log file
+    /// let log_file = AppPath::new(temp_dir.join("logs/2024/app.log"));
+    /// log_file.ensure_parent_dirs()?; // Creates logs/2024/ directories
     ///
     /// # std::fs::remove_dir_all(&temp_dir).ok();
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
+    #[inline]
+    pub fn ensure_parent_dirs(&self) -> std::io::Result<()> {
+        if let Some(parent) = self.parent() {
+            std::fs::create_dir_all(parent.path())
+        } else {
+            Ok(())
+        }
+    }
+
+    /// Creates this path as a directory, including all parent directories.
+    ///
+    /// This method treats the path as a directory and creates it along with
+    /// all necessary parent directories. The created directory will exist
+    /// after this call succeeds.
+    ///
+    /// **Use this when you know the path represents a directory that should be created.**
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use app_path::AppPath;
+    /// use std::env;
+    ///
+    /// let temp_dir = env::temp_dir().join("app_path_dir_example");
+    ///
+    /// // Create a cache directory
+    /// let cache_dir = AppPath::new(temp_dir.join("cache"));
+    /// cache_dir.ensure_dir_exists()?; // Creates cache/ directory
+    /// assert!(cache_dir.exists());
+    /// assert!(cache_dir.is_dir());
+    ///
+    /// // Create nested directories
+    /// let deep_dir = AppPath::new(temp_dir.join("data/backups/daily"));
+    /// deep_dir.ensure_dir_exists()?; // Creates data/backups/daily/ directories
+    /// assert!(deep_dir.exists());
+    /// assert!(deep_dir.is_dir());
+    ///
+    /// # std::fs::remove_dir_all(&temp_dir).ok();
+    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// ```
+    #[inline]
+    pub fn ensure_dir_exists(&self) -> std::io::Result<()> {
+        std::fs::create_dir_all(self.path())
+    }
+
+    /// Creates all directories needed for this path.
+    ///
+    /// **DEPRECATED**: Use [`ensure_parent_dirs()`](Self::ensure_parent_dirs) for file paths
+    /// or [`ensure_dir_exists()`](Self::ensure_dir_exists) for directory paths instead.
+    /// This method name was confusing as it didn't always create directories for the path itself.
+    ///
+    /// This method intelligently determines whether the path represents a file
+    /// or directory and creates the appropriate directories:
+    /// - **For existing directories**: does nothing (already exists)
+    /// - **For existing files**: creates parent directories if needed
+    /// - **For non-existing paths**: treats as file path and creates parent directories
+    ///
+    /// # Migration Guide
+    ///
+    /// ```rust
+    /// use app_path::AppPath;
+    ///
+    /// let file_path = AppPath::new("logs/app.log");
+    /// let dir_path = AppPath::new("cache");
+    ///
+    /// // Old (deprecated):
+    /// // file_path.create_dir_all()?;
+    /// // dir_path.create_dir_all()?; // This was confusing!
+    ///
+    /// // New (clear):
+    /// file_path.ensure_parent_dirs()?; // Creates logs/ for the file
+    /// dir_path.ensure_dir_exists()?;   // Creates cache/ directory
+    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// ```
+    #[deprecated(
+        since = "0.2.2",
+        note = "Use `ensure_parent_dirs()` for file paths or `ensure_dir_exists()` for directory paths instead"
+    )]
+    #[inline]
     pub fn create_dir_all(&self) -> std::io::Result<()> {
         if let Some(parent) = self.full_path.parent() {
             std::fs::create_dir_all(parent)?;
@@ -409,6 +495,7 @@ impl AppPath {
     /// let data_dir = AppPath::with_override("data", config.data_dir.as_deref());
     /// # fn load_config() -> Config { Config { data_dir: None } }
     /// ```
+    #[inline]
     pub fn with_override(
         default: impl AsRef<Path>,
         override_option: Option<impl AsRef<Path>>,
@@ -453,6 +540,7 @@ impl AppPath {
     ///     }
     /// });
     /// ```
+    #[inline]
     pub fn with_override_fn<F, P>(default: impl AsRef<Path>, override_fn: F) -> Self
     where
         F: FnOnce() -> Option<P>,
@@ -524,6 +612,7 @@ impl AppPath {
     ///     Ok((config, data))
     /// }
     /// ```
+    #[inline]
     pub fn try_with_override(
         default: impl AsRef<Path>,
         override_option: Option<impl AsRef<Path>>,
@@ -602,6 +691,7 @@ impl AppPath {
     ///     })
     /// }
     /// ```
+    #[inline]
     pub fn try_with_override_fn<F, P>(
         default: impl AsRef<Path>,
         override_fn: F,

@@ -89,7 +89,7 @@ macro_rules! app_path {
         $crate::AppPath::new($path)
     };
     ($path:expr, env = $env_var:expr) => {
-        $crate::AppPath::with_override($path, std::env::var($env_var).ok())
+        $crate::AppPath::with_override($path, ::std::env::var($env_var).ok())
     };
     ($path:expr, override = $override_expr:expr) => {
         $crate::AppPath::with_override($path, $override_expr)
