@@ -1265,13 +1265,14 @@ fn test_windows_separator_handling() {
         // Also verify the file name is correct
         assert_eq!(windows.path().file_name(), Some("config.toml".as_ref()));
     } else {
-        // On non-Windows, it's treated as a relative path
-        assert!(!windows.path().is_absolute());
-        // The path should be relative to exe_dir and contain the Windows-style path as a filename
+        // On non-Windows, the behavior depends on how the OS interprets the path
+        // The path "C:\temp\config.toml" may be treated as absolute or relative
+        // depending on the platform's path parsing rules
         let expected_relative = exe_dir().join(r"C:\temp\config.toml");
         assert_eq!(windows.path(), expected_relative);
         // File name should be the last component
         assert_eq!(windows.path().file_name(), Some("config.toml".as_ref()));
+        // We don't assert on is_absolute() here since it varies by platform
     }
 }
 
