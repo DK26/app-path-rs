@@ -33,20 +33,35 @@
 //!
 //! ## API Design
 //!
-//! - [`AppPath::new()`] - **Recommended**: Simple, infallible constructor
+//! - [`AppPath::new()`] - **Recommended**: Simple constructor (panics on failure)
 //! - [`AppPath::try_new()`] - **Libraries**: Fallible version for error handling
 //! - [`AppPath::with_override()`] - **Deployment**: Environment-configurable paths
 //! - [`AppPath::ensure_parent_dirs()`] - **Files**: Creates parent directories for files
 //! - [`AppPath::ensure_dir_exists()`] - **Directories**: Creates directories (and parents)
-//! - [`exe_dir()`] - **Advanced**: Direct access to executable directory
+//! - [`exe_dir()`] - **Advanced**: Direct access to executable directory (panics on failure)
+//! - [`try_exe_dir()`] - **Libraries**: Fallible executable directory access
 //!
-//! ## Panic Conditions
+//! ## Function Variants
+//!
+//! This crate provides both panicking and fallible variants for most operations:
+//!
+//! | Panicking (Recommended) | Fallible (Libraries) | Use Case |
+//! |------------------------|---------------------|----------|
+//! | [`AppPath::new()`] | [`AppPath::try_new()`] | Most applications vs. libraries |
+//! | [`exe_dir()`] | [`try_exe_dir()`] | Direct directory access |
+//!
+//! ### Panic Conditions
 //!
 //! [`AppPath::new()`] and [`exe_dir()`] panic only if executable location cannot be determined:
-//! - `std::env::current_exe()` fails (extremely rare)
-//! - Executable path is empty (system corruption)
+//! - `std::env::current_exe()` fails (extremely rare system failure)
+//! - Executable path is empty (indicates system corruption)
 //!
-//! These represent unrecoverable system failures. For fallible behavior, use [`AppPath::try_new()`].
+//! These represent unrecoverable system failures that occur at application startup.
+//! After the first successful call, the executable directory is cached and subsequent
+//! calls never panic.
+//!
+//! **For libraries or applications requiring graceful error handling**, use the fallible
+//! variants [`AppPath::try_new()`] and [`try_exe_dir()`] instead.
 
 mod app_path;
 mod error;
