@@ -30,7 +30,8 @@ use crate::functions::try_exe_dir;
 /// After first successful call, methods never panic (uses cached result).
 ///
 /// # Examples
-/// /// ```rust
+///
+/// ```rust
 /// use app_path::AppPath;
 ///
 /// // Basic usage - most common pattern
