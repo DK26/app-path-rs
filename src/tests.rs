@@ -1265,14 +1265,14 @@ fn test_windows_separator_handling() {
         // Also verify the file name is correct
         assert_eq!(windows.path().file_name(), Some("config.toml".as_ref()));
     } else {
-        // On non-Windows, the behavior depends on how the OS interprets the path
-        // The path "C:\temp\config.toml" may be treated as absolute or relative
-        // depending on the platform's path parsing rules
+        // On non-Windows, this is treated as a relative path and joined with exe_dir
+        // The backslashes are literal characters in the filename
         let expected_relative = exe_dir().join(r"C:\temp\config.toml");
         assert_eq!(windows.path(), expected_relative);
-        // File name should be the last component
-        assert_eq!(windows.path().file_name(), Some("config.toml".as_ref()));
-        // We don't assert on is_absolute() here since it varies by platform
+        // File name should be the entire string since backslashes are literal
+        assert_eq!(windows.path().file_name(), Some("C:\\temp\\config.toml".as_ref()));
+        // Should be absolute because it's joined with exe_dir
+        assert!(windows.path().is_absolute());
     }
 }
 
@@ -1396,3 +1396,5 @@ fn test_methods_comparison() {
     // Cleanup
     fs::remove_dir_all(&temp_dir).ok();
 }
+
+

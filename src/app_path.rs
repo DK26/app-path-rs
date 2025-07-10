@@ -278,15 +278,7 @@ impl AppPath {
     #[inline]
     pub fn try_new(path: impl AsRef<Path>) -> Result<Self, AppPathError> {
         let exe_dir = try_exe_dir()?;
-        let input_path = path.as_ref();
-
-        // Apply the same resolution strategy as new()
-        let full_path = if input_path.is_absolute() {
-            input_path.to_path_buf()
-        } else {
-            exe_dir.join(input_path)
-        };
-
+        let full_path = exe_dir.join(path);
         Ok(Self { full_path })
     }
 
