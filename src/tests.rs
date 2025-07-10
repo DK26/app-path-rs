@@ -1270,7 +1270,10 @@ fn test_windows_separator_handling() {
         let expected_relative = exe_dir().join(r"C:\temp\config.toml");
         assert_eq!(windows.path(), expected_relative);
         // File name should be the entire string since backslashes are literal
-        assert_eq!(windows.path().file_name(), Some("C:\\temp\\config.toml".as_ref()));
+        assert_eq!(
+            windows.path().file_name(),
+            Some("C:\\temp\\config.toml".as_ref())
+        );
         // Should be absolute because it's joined with exe_dir
         assert!(windows.path().is_absolute());
     }
@@ -1396,5 +1399,3 @@ fn test_methods_comparison() {
     // Cleanup
     fs::remove_dir_all(&temp_dir).ok();
 }
-
-
