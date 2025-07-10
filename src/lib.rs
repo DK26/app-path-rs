@@ -17,7 +17,9 @@
 //!     let content = std::fs::read_to_string(&config)?;
 //! }
 //!
-//! logs.create_dir_all()?; // Creates logs/ directory
+//! // Create directories with clear intent
+//! logs.ensure_parent_dirs()?; // Creates logs/ directory for the file
+//! database.ensure_parent_dirs()?; // Creates data/ directory for the file
 //! # Ok::<(), Box<dyn std::error::Error>>(())
 //! ```
 //!
@@ -34,6 +36,8 @@
 //! - [`AppPath::new()`] - **Recommended**: Simple, infallible constructor
 //! - [`AppPath::try_new()`] - **Libraries**: Fallible version for error handling
 //! - [`AppPath::with_override()`] - **Deployment**: Environment-configurable paths
+//! - [`AppPath::ensure_parent_dirs()`] - **Files**: Creates parent directories for files
+//! - [`AppPath::ensure_dir_exists()`] - **Directories**: Creates directories (and parents)
 //! - [`exe_dir()`] - **Advanced**: Direct access to executable directory
 //!
 //! ## Panic Conditions
