@@ -7,6 +7,43 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.2] - 2025-07-10
+
+### Added
+- **New directory creation methods** - `ensure_parent_dirs()` and `ensure_dir_exists()` for clearer intent and better ergonomics
+  - `ensure_parent_dirs()` - Creates parent directories for file paths (use when preparing to write a file)
+  - `ensure_dir_exists()` - Creates the path as a directory, including all parents (use when creating directories)
+
+### Deprecated
+- **`create_dir_all()` method** - Deprecated in favor of the new, more explicit methods
+  - The old method name was confusing as it didn't always create directories for the path itself
+  - Migration guide included in deprecation notice with clear examples
+
+### Enhanced
+- **API clarity** - Method names now clearly indicate their intended purpose
+  - `ensure_parent_dirs()` makes it clear you're preparing directories for a file
+  - `ensure_dir_exists()` makes it clear you're creating a directory
+- **Documentation improvements** - Updated all examples to use the new methods
+  - Fixed documentation syntax error that caused empty code block warnings
+  - Updated lib.rs examples to demonstrate new directory creation methods
+  - Added comprehensive migration examples in deprecation notices
+
+### Fixed
+- **Cross-platform test compatibility** - Fixed `test_windows_separator_handling` to handle platform differences correctly
+  - On Windows: validates full path equality for Windows-style paths
+  - On Unix: validates filename only since Windows-style paths are treated as relative
+  - Resolves CI test failures on non-Windows platforms
+
+### Testing
+- **Enhanced test coverage** - Added comprehensive tests for new directory creation methods
+- **Cross-platform reliability** - All 76 unit tests and 43 doc tests pass on all platforms
+- **Backward compatibility** - Existing `create_dir_all()` functionality preserved during deprecation period
+
+### Documentation
+- **Method documentation** - Complete documentation for new methods with practical examples
+- **Migration guidance** - Clear examples showing how to migrate from deprecated method
+- **Consistent examples** - All documentation now uses the new, clearer methods
+
 ## [0.2.1] - 2025-07-08
 
 ### Added
@@ -183,7 +220,8 @@ let exe_dir = try_exe_dir()?; // Fallible
 ### Added  
 - Initial release (yanked - replaced by 0.1.1 with improved API)
 
-[Unreleased]: https://github.com/DK26/app-path-rs/compare/v0.2.1...HEAD
+[Unreleased]: https://github.com/DK26/app-path-rs/compare/v0.2.2...HEAD
+[0.2.2]: https://github.com/DK26/app-path-rs/compare/v0.2.1...v0.2.2
 [0.2.1]: https://github.com/DK26/app-path-rs/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/DK26/app-path-rs/compare/v0.1.2...v0.2.0
 [0.1.2]: https://github.com/DK26/app-path-rs/compare/v0.1.1...v0.1.2

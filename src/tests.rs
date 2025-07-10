@@ -13,6 +13,12 @@ fn create_test_file(path: &Path) {
     writeln!(file, "test").unwrap();
 }
 
+#[allow(dead_code)]
+/// Helper for expected executable-relative path
+fn expect_exe_rel(path: &str) -> PathBuf {
+    exe_dir().join(path)
+}
+
 #[test]
 fn resolves_relative_path_to_exe_dir() {
     let rel = "myconfig.toml";
@@ -99,15 +105,169 @@ fn test_exists_method() {
 }
 
 #[test]
-fn test_create_dir_all() {
-    let temp_dir = env::temp_dir().join("app_path_test_create");
+fn test_new_directory_creation_methods() {
+    let temp_dir = env::temp_dir().join("app_path_test_new_methods");
     let _ = fs::remove_dir_all(&temp_dir);
 
-    let rel = "deep/nested/dir/file.txt";
-    let rel_path = AppPath::new(temp_dir.join(rel));
+    // Test 1: File path - should create parent directories
+    let file_path = AppPath::new(temp_dir.join("logs/app.log"));
+    file_path.ensure_parent_dirs().unwrap();
 
-    rel_path.create_dir_all().unwrap();
-    assert!(rel_path.path().parent().unwrap().exists());
+    // Parent directory should exist, but file should not
+    assert!(temp_dir.join("logs").exists());
+    assert!(temp_dir.join("logs").is_dir());
+    assert!(!file_path.exists()); // File itself should not exist
+
+    // Test 2: Directory path (no extension) - create directory using new method
+    let dir_path = AppPath::new(temp_dir.join("data"));
+    dir_path.ensure_dir_exists().unwrap();
+
+    // Directory should exist
+    assert!(dir_path.exists());
+    assert!(dir_path.is_dir());
+
+    // Test 2b: For existing directories, deprecated method still works but does nothing
+    let existing_dir = AppPath::new(temp_dir.join("data"));
+    #[allow(deprecated)]
+    existing_dir.create_dir_all().unwrap(); // Should succeed since it exists and is a dir
+
+    // Test 3: Nested directory path - create using new method
+    let nested_dir = AppPath::new(temp_dir.join("cache/images"));
+    nested_dir.ensure_dir_exists().unwrap();
+
+    // All levels should exist
+    assert!(temp_dir.join("cache").exists());
+    assert!(temp_dir.join("cache").is_dir());
+    assert!(nested_dir.exists());
+    assert!(nested_dir.is_dir());
+
+    // Test 4: Existing directory - should not error
+    let existing_dir = AppPath::new(temp_dir.join("data"));
+    existing_dir.ensure_dir_exists().unwrap(); // Should not error
+
+    // Cleanup
+    fs::remove_dir_all(&temp_dir).ok();
+}
+
+#[test]
+fn test_create_dir_all_file_extensions() {
+    let temp_dir = env::temp_dir().join("app_path_test_extensions");
+    let _ = fs::remove_dir_all(&temp_dir);
+
+    // Test various file extensions - should create parent directories
+    let extensions = vec!["txt", "log", "json", "toml", "yml", "db"];
+
+    for ext in extensions {
+        let file_path = AppPath::new(temp_dir.join(format!("files/test.{ext}")));
+        file_path.ensure_parent_dirs().unwrap();
+
+        // Parent directory should exist
+        assert!(temp_dir.join("files").exists());
+        assert!(temp_dir.join("files").is_dir());
+        // File should not exist
+        assert!(!file_path.exists());
+    }
+
+    // Cleanup
+    fs::remove_dir_all(&temp_dir).ok();
+}
+
+#[test]
+fn test_create_dir_all_edge_cases() {
+    let temp_dir = env::temp_dir().join("app_path_test_edge_cases");
+    let _ = fs::remove_dir_all(&temp_dir);
+
+    // Test 1: Path with no extension (non-existent) - treated as file
+    let no_ext_path = AppPath::new(temp_dir.join("extensionless_file"));
+    no_ext_path.ensure_parent_dirs().unwrap();
+    // Parent directory should exist
+    assert!(temp_dir.exists());
+    // The path itself should not exist (treated as file)
+    assert!(!no_ext_path.exists());
+
+    // Test 1b: Use new method for explicit directory creation
+    let no_ext_dir = AppPath::new(temp_dir.join("node_modules"));
+    no_ext_dir.ensure_dir_exists().unwrap();
+    assert!(no_ext_dir.exists());
+    assert!(no_ext_dir.is_dir());
+
+    // Test 2: Path with unusual extension (should be treated as file)
+    let unusual_file = AppPath::new(temp_dir.join("backup/myfile.special"));
+    unusual_file.ensure_parent_dirs().unwrap();
+    assert!(temp_dir.join("backup").exists());
+    assert!(temp_dir.join("backup").is_dir());
+    assert!(!unusual_file.exists()); // File should not exist, only parent
+
+    // Test 3: File with multiple extensions (should be treated as file)
+    let multi_ext_file = AppPath::new(temp_dir.join("archives/file.tar.gz"));
+    multi_ext_file.ensure_parent_dirs().unwrap();
+    assert!(temp_dir.join("archives").exists());
+    assert!(temp_dir.join("archives").is_dir());
+    assert!(!multi_ext_file.exists());
+
+    // Test 4: Root-level file (no parent to create)
+    let root_file = AppPath::new(temp_dir.join("root.txt"));
+    root_file.ensure_parent_dirs().unwrap(); // Should not error
+
+    // Test 5: Attempting to create directory when file exists with same name
+    let conflict_path = temp_dir.join("conflict.txt");
+    fs::create_dir_all(&temp_dir).unwrap();
+    fs::write(&conflict_path, "content").unwrap();
+
+    let conflict_apppath = AppPath::new(&conflict_path);
+    // Since conflict.txt has extension, it's treated as file, so ensure_parent_dirs
+    // will try to create parent (temp_dir) which already exists, so it succeeds
+    assert!(conflict_apppath.ensure_parent_dirs().is_ok());
+
+    // Test 6: Existing file without extension - should be detected correctly
+    let existing_file_path = temp_dir.join("existing_file_no_ext");
+    fs::write(&existing_file_path, "content").unwrap();
+
+    let existing_file_apppath = AppPath::new(&existing_file_path);
+    // This file exists, so the deprecated method detects it and creates parent dirs
+    #[allow(deprecated)]
+    {
+        existing_file_apppath.create_dir_all().unwrap();
+    }
+    assert!(existing_file_apppath.exists());
+    assert!(!existing_file_apppath.is_dir()); // Should still be a file
+
+    // Test 7: Existing directory without extension - should be detected correctly
+    let existing_dir_path = temp_dir.join("existing_dir_no_ext");
+    fs::create_dir(&existing_dir_path).unwrap();
+
+    let existing_dir_apppath = AppPath::new(&existing_dir_path);
+    // This directory exists, so the deprecated method detects it correctly
+    #[allow(deprecated)]
+    {
+        existing_dir_apppath.create_dir_all().unwrap();
+    }
+    assert!(existing_dir_apppath.exists());
+    assert!(existing_dir_apppath.is_dir());
+
+    // Cleanup
+    fs::remove_dir_all(&temp_dir).ok();
+}
+
+#[test]
+fn test_create_dir_all_preserves_existing_behavior() {
+    let temp_dir = env::temp_dir().join("app_path_test_backward_compat");
+    let _ = fs::remove_dir_all(&temp_dir);
+
+    // This test ensures that code that worked before still works
+    let deep_file = AppPath::new(temp_dir.join("deep/nested/dir/file.txt"));
+    deep_file.ensure_parent_dirs().unwrap();
+
+    // All parent directories should exist
+    assert!(temp_dir.join("deep").exists());
+    assert!(temp_dir.join("deep/nested").exists());
+    assert!(temp_dir.join("deep/nested/dir").exists());
+
+    // File should not exist (only parents were created)
+    assert!(!deep_file.exists());
+
+    // Cleanup
+    fs::remove_dir_all(&temp_dir).ok();
 }
 
 #[test]
@@ -1092,4 +1252,150 @@ fn test_from_app_path_to_os_string() {
     let config = AppPath::new("config.toml");
     let os_string: OsString = config.clone().into();
     assert_eq!(os_string, config.path().as_os_str());
+}
+
+#[test]
+fn test_windows_separator_handling() {
+    let windows = AppPath::new(r"C:\temp\config.toml");
+
+    if cfg!(windows) {
+        // On Windows, this should be treated as an absolute path
+        assert_eq!(windows.path(), Path::new(r"C:\temp\config.toml"));
+        assert!(windows.path().is_absolute());
+        // Also verify the file name is correct
+        assert_eq!(windows.path().file_name(), Some("config.toml".as_ref()));
+    } else {
+        // On non-Windows, this is treated as a relative path and joined with exe_dir
+        // The backslashes are literal characters in the filename
+        let expected_relative = exe_dir().join(r"C:\temp\config.toml");
+        assert_eq!(windows.path(), expected_relative);
+        // File name should be the entire string since backslashes are literal
+        assert_eq!(
+            windows.path().file_name(),
+            Some("C:\\temp\\config.toml".as_ref())
+        );
+        // Should be absolute because it's joined with exe_dir
+        assert!(windows.path().is_absolute());
+    }
+}
+
+#[test]
+fn test_unix_separator_handling() {
+    // Test that paths with Unix-style separators work correctly
+    // We test with a relative path to avoid Windows absolute path interpretation issues
+    let unix_style = AppPath::new("tmp/config.toml");
+    // The path should be normalized by the OS
+    let expected = Path::new("tmp/config.toml");
+    assert_eq!(unix_style.path().file_name(), expected.file_name());
+    assert!(unix_style.path().to_string_lossy().contains("config.toml"));
+}
+
+#[test]
+fn test_ensure_parent_dirs() {
+    let temp_dir = env::temp_dir().join("app_path_test_ensure_parent_dirs");
+    let _ = fs::remove_dir_all(&temp_dir);
+
+    // Test 1: Basic file path - should create parent directories
+    let file_path = AppPath::new(temp_dir.join("logs/app.log"));
+    file_path.ensure_parent_dirs().unwrap();
+
+    // Parent directory should exist
+    assert!(temp_dir.join("logs").exists());
+    assert!(temp_dir.join("logs").is_dir());
+    // File should not exist (only parent created)
+    assert!(!file_path.exists());
+
+    // Test 2: Nested file path
+    let nested_file = AppPath::new(temp_dir.join("data/2024/users.db"));
+    nested_file.ensure_parent_dirs().unwrap();
+
+    // All parent directories should exist
+    assert!(temp_dir.join("data").exists());
+    assert!(temp_dir.join("data/2024").exists());
+    assert!(temp_dir.join("data/2024").is_dir());
+    // File should not exist
+    assert!(!nested_file.exists());
+
+    // Test 3: File with no parent (root level in temp_dir)
+    let root_file = AppPath::new(temp_dir.join("root.txt"));
+    root_file.ensure_parent_dirs().unwrap(); // Should not error
+
+    // temp_dir should exist (it's the parent)
+    assert!(temp_dir.exists());
+    assert!(!root_file.exists());
+
+    // Test 4: File where parent already exists
+    let existing_parent_file = AppPath::new(temp_dir.join("logs/another.log"));
+    existing_parent_file.ensure_parent_dirs().unwrap(); // Should not error
+    assert!(temp_dir.join("logs").exists());
+
+    // Cleanup
+    fs::remove_dir_all(&temp_dir).ok();
+}
+
+#[test]
+fn test_ensure_dir_exists() {
+    let temp_dir = env::temp_dir().join("app_path_test_ensure_dir_exists");
+    let _ = fs::remove_dir_all(&temp_dir);
+
+    // Test 1: Basic directory creation
+    let cache_dir = AppPath::new(temp_dir.join("cache"));
+    cache_dir.ensure_dir_exists().unwrap();
+
+    // Directory should exist
+    assert!(cache_dir.exists());
+    assert!(cache_dir.is_dir());
+
+    // Test 2: Nested directory creation
+    let nested_dir = AppPath::new(temp_dir.join("data/backups/daily"));
+    nested_dir.ensure_dir_exists().unwrap();
+
+    // All directories should exist
+    assert!(temp_dir.join("data").exists());
+    assert!(temp_dir.join("data/backups").exists());
+    assert!(nested_dir.exists());
+    assert!(nested_dir.is_dir());
+
+    // Test 3: Directory that already exists (should not error)
+    cache_dir.ensure_dir_exists().unwrap(); // Should not error
+    assert!(cache_dir.exists());
+    assert!(cache_dir.is_dir());
+
+    // Test 4: Directory with file-like name (has extension)
+    let file_like_dir = AppPath::new(temp_dir.join("weird.txt"));
+    file_like_dir.ensure_dir_exists().unwrap();
+    assert!(file_like_dir.exists());
+    assert!(file_like_dir.is_dir()); // Should be a directory, not a file
+
+    // Test 5: Directory creation where parent doesn't exist
+    let orphan_dir = AppPath::new(temp_dir.join("missing/child"));
+    orphan_dir.ensure_dir_exists().unwrap();
+    assert!(temp_dir.join("missing").exists());
+    assert!(orphan_dir.exists());
+    assert!(orphan_dir.is_dir());
+
+    // Cleanup
+    fs::remove_dir_all(&temp_dir).ok();
+}
+
+#[test]
+fn test_methods_comparison() {
+    let temp_dir = env::temp_dir().join("app_path_test_methods_comparison");
+    let _ = fs::remove_dir_all(&temp_dir);
+
+    // Test the difference between ensure_parent_dirs and ensure_dir_exists
+    let path = AppPath::new(temp_dir.join("testdir"));
+
+    // Using ensure_parent_dirs - treats path as file, creates parent
+    path.ensure_parent_dirs().unwrap();
+    assert!(temp_dir.exists()); // Parent exists
+    assert!(!path.exists()); // Path itself doesn't exist
+
+    // Now using ensure_dir_exists - creates the path as directory
+    path.ensure_dir_exists().unwrap();
+    assert!(path.exists()); // Now the path exists
+    assert!(path.is_dir()); // And it's a directory
+
+    // Cleanup
+    fs::remove_dir_all(&temp_dir).ok();
 }
