@@ -52,7 +52,9 @@
 //! - [`AppPath::new()`] - **Recommended**: Simple constructor (panics on failure)
 //! - [`AppPath::try_new()`] - **Libraries**: Fallible version for error handling
 //! - [`AppPath::with_override()`] - **Deployment**: Environment-configurable paths
+//! - [`AppPath::with_override_fn()`] - **Advanced**: Function-based override logic
 //! - [`app_path!`] - **Macro**: Convenient syntax with optional environment overrides
+//! - [`try_app_path!`] - **Macro (Fallible)**: Returns `Result` for explicit error handling
 //! - [`AppPath::ensure_parent_dirs()`] - **Files**: Creates parent directories for files
 //! - [`AppPath::ensure_dir_exists()`] - **Directories**: Creates directories (and parents)
 //! - [`exe_dir()`] - **Advanced**: Direct access to executable directory (panics on failure)
@@ -65,6 +67,7 @@
 //! | Panicking (Recommended) | Fallible (Libraries) | Use Case |
 //! |------------------------|---------------------|----------|
 //! | [`AppPath::new()`] | [`AppPath::try_new()`] | Most applications vs. libraries |
+//! | [`app_path!`] | [`try_app_path!`] | Convenient macros |
 //! | [`exe_dir()`] | [`try_exe_dir()`] | Direct directory access |
 //!
 //! ### Panic Conditions
@@ -103,6 +106,7 @@ pub use functions::{exe_dir, try_exe_dir};
 /// - `app_path!(path)` - Simple path creation (equivalent to `AppPath::new(path)`)
 /// - `app_path!(path, env = "VAR_NAME")` - With environment variable override
 /// - `app_path!(path, override = expression)` - With any optional override expression
+/// - `app_path!(path, fn = function)` - With function-based override logic
 ///
 /// # Examples
 ///
@@ -118,6 +122,13 @@ pub use functions::{exe_dir, try_exe_dir};
 ///
 /// // Custom override expression
 /// let log_file = app_path!("app.log", override = std::env::args().nth(1));
+///
+/// // Function-based override
+/// let config_dir = app_path!("config", fn = || {
+///     std::env::var("XDG_CONFIG_HOME")
+///         .or_else(|_| std::env::var("HOME").map(|h| format!("{h}/.config")))
+///         .ok()
+/// });
 /// ```
 #[macro_export]
 macro_rules! app_path {
@@ -129,6 +140,9 @@ macro_rules! app_path {
     };
     ($path:expr, override = $override_expr:expr) => {
         $crate::AppPath::with_override($path, $override_expr)
+    };
+    ($path:expr, fn = $override_fn:expr) => {
+        $crate::AppPath::with_override_fn($path, $override_fn)
     };
 }
 
@@ -143,6 +157,7 @@ macro_rules! app_path {
 /// - `try_app_path!(path)` - Simple path creation (equivalent to `AppPath::try_new(path)`)
 /// - `try_app_path!(path, env = "VAR_NAME")` - With environment variable override
 /// - `try_app_path!(path, override = expression)` - With any optional override expression
+/// - `try_app_path!(path, fn = function)` - With function-based override logic
 ///
 /// # Examples
 ///
@@ -186,13 +201,29 @@ macro_rules! app_path {
 ///
 /// fn get_data_dir() -> Option<String> {
 ///     std::env::var("XDG_DATA_HOME")
-///         .or_else(|_| std::env::var("HOME").map(|h| format!("{}/.local/share", h)))
+///         .or_else(|_| std::env::var("HOME").map(|h| format!("{h}/.local/share")))
 ///         .ok()
 /// }
 ///
 /// fn setup_data() -> Result<(), Box<dyn std::error::Error>> {
 ///     let data_dir = try_app_path!("data", override = get_data_dir())?;
 ///     data_dir.ensure_dir_exists()?;
+///     Ok(())
+/// }
+/// ```
+///
+/// ## Function-Based Override
+///
+/// ```rust
+/// use app_path::try_app_path;
+///
+/// fn setup_cache() -> Result<(), Box<dyn std::error::Error>> {
+///     let cache_dir = try_app_path!("cache", fn = || {
+///         std::env::var("XDG_CACHE_HOME")
+///             .or_else(|_| std::env::var("HOME").map(|h| format!("{h}/.cache")))
+///             .ok()
+///     })?;
+///     cache_dir.ensure_dir_exists()?;
 ///     Ok(())
 /// }
 /// ```
@@ -264,5 +295,8 @@ macro_rules! try_app_path {
     };
     ($path:expr, override = $override_expr:expr) => {
         $crate::AppPath::try_with_override($path, $override_expr)
+    };
+    ($path:expr, fn = $override_fn:expr) => {
+        $crate::AppPath::try_with_override_fn($path, $override_fn)
     };
 }

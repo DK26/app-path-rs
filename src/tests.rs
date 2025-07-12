@@ -1531,4 +1531,109 @@ fn test_try_app_path_macro_syntax_variants() {
 
     let with_some_override = try_app_path!("default.toml", override = Some("custom.toml"));
     assert!(with_some_override.is_ok());
+
+    // Test new fn variant
+    let with_fn = try_app_path!("default.toml", fn = || None::<String>);
+    assert!(with_fn.is_ok());
+
+    let with_fn_some = try_app_path!("default.toml", fn = || Some("custom_fn.toml"));
+    assert!(with_fn_some.is_ok());
+}
+
+// === Function-based Override Tests ===
+
+#[test]
+fn test_app_path_macro_with_fn() {
+    let custom_path = env::temp_dir().join("custom_fn.toml");
+
+    // Test fn variant that returns Some
+    let config = app_path!("default.toml", fn = || Some(custom_path.clone()));
+    assert_eq!(config.path(), custom_path);
+
+    // Test fn variant that returns None
+    let default_config = app_path!("default.toml", fn = || None::<PathBuf>);
+    let expected = exe_dir().join("default.toml");
+    assert_eq!(default_config.path(), expected);
+
+    // Test fn variant with complex logic
+    let complex_config = app_path!("config.toml", fn = || {
+        if env::var("USE_CUSTOM_CONFIG").is_ok() {
+            Some(env::temp_dir().join("custom.toml"))
+        } else {
+            None
+        }
+    });
+    let expected_complex = exe_dir().join("config.toml");
+    assert_eq!(complex_config.path(), expected_complex);
+}
+
+#[test]
+fn test_try_app_path_macro_with_fn() {
+    let custom_path = env::temp_dir().join("custom_fn.toml");
+
+    // Test fn variant that returns Some
+    let config = try_app_path!("default.toml", fn = || Some(custom_path.clone())).unwrap();
+    assert_eq!(config.path(), custom_path);
+
+    // Test fn variant that returns None
+    let default_config = try_app_path!("default.toml", fn = || None::<PathBuf>).unwrap();
+    let expected = exe_dir().join("default.toml");
+    assert_eq!(default_config.path(), expected);
+
+    // Test fn variant with complex logic
+    let complex_config = try_app_path!("config.toml", fn = || {
+        if env::var("USE_CUSTOM_TRY_CONFIG").is_ok() {
+            Some(env::temp_dir().join("custom_try.toml"))
+        } else {
+            None
+        }
+    })
+    .unwrap();
+    let expected_complex = exe_dir().join("config.toml");
+    assert_eq!(complex_config.path(), expected_complex);
+}
+
+#[test]
+fn test_macro_fn_variants_equivalence() {
+    // Test that both macros produce equivalent results when function returns None
+    let panicking_fn = app_path!("test.toml", fn = || None::<String>);
+    let fallible_fn = try_app_path!("test.toml", fn = || None::<String>).unwrap();
+    assert_eq!(panicking_fn.path(), fallible_fn.path());
+
+    // Test with function that returns Some
+    let custom_path = env::temp_dir().join("equiv_test.toml");
+    let panicking_fn_some = app_path!("test.toml", fn = || Some(custom_path.clone()));
+    let fallible_fn_some = try_app_path!("test.toml", fn = || Some(custom_path.clone())).unwrap();
+    assert_eq!(panicking_fn_some.path(), fallible_fn_some.path());
+}
+
+#[test]
+fn test_fn_variant_with_real_xdg_logic() {
+    // Test realistic XDG-style function that returns complete app config path
+    fn get_config_path() -> Option<PathBuf> {
+        env::var("XDG_CONFIG_HOME")
+            .or_else(|_| env::var("HOME").map(|h| format!("{h}/.config")))
+            .ok()
+            .map(|config_dir| PathBuf::from(config_dir).join("myapp"))
+    }
+
+    // Test both macros with realistic function
+    let config_app_path = app_path!("config.toml", fn = get_config_path);
+    let config_try_app_path = try_app_path!("config.toml", fn = get_config_path).unwrap();
+
+    // Both should use the same path, whether it's XDG or default
+    assert_eq!(config_app_path.path(), config_try_app_path.path());
+
+    // Check if XDG logic would be used
+    if env::var("XDG_CONFIG_HOME").is_ok() || env::var("HOME").is_ok() {
+        // If XDG variables are available, should use the XDG path
+        let xdg_result = get_config_path();
+        if let Some(xdg_path) = xdg_result {
+            assert_eq!(config_app_path.path(), xdg_path);
+        }
+    } else {
+        // If no XDG variables, should use default path
+        let expected = exe_dir().join("config.toml");
+        assert_eq!(config_app_path.path(), expected);
+    }
 }

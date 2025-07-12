@@ -49,16 +49,44 @@ let database = app_path!("data/users.db");
 let logs = app_path!("logs/app.log", env = "LOG_PATH");
 let cache = app_path!("cache", env = "CACHE_DIR");
 
-// Custom override logic
+// Custom override logic with block expression
 let data_dir = app_path!("data", override = {
     std::env::var("DATA_DIR")
-        .or_else(|_| std::env::var("XDG_DATA_HOME").map(|p| format!("{}/myapp", p)))
+        .or_else(|_| std::env::var("XDG_DATA_HOME").map(|p| format!("{p}/myapp")))
         .ok()
 });
+
+// Function-based override (great for XDG support)
+let config_dir = app_path!("config", fn = || {
+    std::env::var("XDG_CONFIG_HOME")
+        .or_else(|_| std::env::var("HOME").map(|h| format!("{h}/.config/myapp")))
+        .ok()
+});
+
+// Simple override with optional value
+let config = app_path!("config.toml", override = std::env::var("CONFIG_PATH").ok());
 
 // Directory creation with clear intent
 logs.ensure_parent_dirs()?;              // Creates logs/ for the file
 app_path!("temp").ensure_dir_exists()?;  // Creates temp/ directory itself
+```
+
+### Fallible `try_app_path!` Macro (Libraries)
+
+For libraries or applications requiring explicit error handling:
+
+```rust
+use app_path::{try_app_path, AppPathError};
+
+// Returns Result<AppPath, AppPathError> instead of panicking
+let config = try_app_path!("config.toml")?;
+let database = try_app_path!("data/users.db", env = "DATABASE_PATH")?;
+
+// Same syntax, graceful error handling
+match try_app_path!("logs/app.log") {
+    Ok(log_path) => log_path.ensure_parent_dirs()?,
+    Err(e) => eprintln!("Failed to determine log path: {}", e),
+}
 ```
 
 ### Constructor API (Alternative)
