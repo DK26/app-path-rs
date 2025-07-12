@@ -1,4 +1,4 @@
-use crate::{app_path, exe_dir, try_exe_dir, AppPath, AppPathError};
+use crate::{app_path, exe_dir, try_app_path, try_exe_dir, AppPath, AppPathError};
 use std::env;
 use std::fs::{self, File};
 use std::io::Write;
@@ -1398,4 +1398,137 @@ fn test_methods_comparison() {
 
     // Cleanup
     fs::remove_dir_all(&temp_dir).ok();
+}
+
+// === try_app_path! Macro Tests ===
+
+#[test]
+fn test_try_app_path_macro_basic() {
+    let config = try_app_path!("config.toml").unwrap();
+    let expected = AppPath::try_new("config.toml").unwrap();
+    assert_eq!(config.path(), expected.path());
+}
+
+#[test]
+fn test_try_app_path_macro_with_env() {
+    let temp_dir = env::temp_dir();
+    let custom_path = temp_dir.join("custom_config.toml");
+    env::set_var("TEST_TRY_CONFIG_PATH", &custom_path);
+
+    let config = try_app_path!("default.toml", env = "TEST_TRY_CONFIG_PATH").unwrap();
+    assert_eq!(config.path(), custom_path);
+
+    // Test with non-existent env var
+    let default_config = try_app_path!("default.toml", env = "NON_EXISTENT_VAR").unwrap();
+    let expected = exe_dir().join("default.toml");
+    assert_eq!(default_config.path(), expected);
+
+    env::remove_var("TEST_TRY_CONFIG_PATH");
+}
+
+#[test]
+fn test_try_app_path_macro_with_override() {
+    let temp_dir = env::temp_dir();
+    let override_path = temp_dir.join("custom_path.toml");
+    let config = try_app_path!("default.toml", override = Some(override_path.clone())).unwrap();
+    assert_eq!(config.path(), override_path);
+
+    let no_override: Option<PathBuf> = None;
+    let default_config = try_app_path!("default.toml", override = no_override).unwrap();
+    let expected = exe_dir().join("default.toml");
+    assert_eq!(default_config.path(), expected);
+}
+
+#[test]
+fn test_try_app_path_macro_returns_result() {
+    // Test that the macro returns a Result type
+    let result = try_app_path!("test.toml");
+    assert!(result.is_ok());
+
+    // Test error handling pattern
+    match try_app_path!("test.toml") {
+        Ok(path) => {
+            assert!(path.path().ends_with("test.toml"));
+        }
+        Err(_) => panic!("Should not fail in normal conditions"),
+    }
+}
+
+#[test]
+fn test_try_app_path_vs_app_path_equivalence() {
+    // The successful results should be equivalent
+    let panicking = app_path!("config.toml");
+    let fallible = try_app_path!("config.toml").unwrap();
+    assert_eq!(panicking.path(), fallible.path());
+
+    // Test with env override
+    env::set_var("TEST_EQUIV_PATH", "/tmp/test.conf");
+    let panicking_env = app_path!("default.conf", env = "TEST_EQUIV_PATH");
+    let fallible_env = try_app_path!("default.conf", env = "TEST_EQUIV_PATH").unwrap();
+    assert_eq!(panicking_env.path(), fallible_env.path());
+    env::remove_var("TEST_EQUIV_PATH");
+
+    // Test with custom override
+    let override_path = Some(PathBuf::from("/custom/path.conf"));
+    let panicking_override = app_path!("default.conf", override = override_path.clone());
+    let fallible_override = try_app_path!("default.conf", override = override_path).unwrap();
+    assert_eq!(panicking_override.path(), fallible_override.path());
+}
+
+#[test]
+fn test_try_app_path_macro_error_handling_patterns() {
+    // Test typical error handling patterns
+    fn load_config() -> Result<String, Box<dyn std::error::Error>> {
+        let config_path = try_app_path!("config.toml")?;
+        // In a real scenario, this might fail if file doesn't exist
+        // But for testing, we just return a dummy value
+        Ok(format!("Config at: {}", config_path.display()))
+    }
+
+    assert!(load_config().is_ok());
+
+    // Test propagation with ?
+    fn setup_paths() -> Result<(AppPath, AppPath), AppPathError> {
+        let config = try_app_path!("config.toml")?;
+        let data = try_app_path!("data.db")?;
+        Ok((config, data))
+    }
+
+    let (config, data) = setup_paths().unwrap();
+    assert!(config.path().ends_with("config.toml"));
+    assert!(data.path().ends_with("data.db"));
+}
+
+#[test]
+fn test_try_app_path_macro_in_library_context() {
+    // Simulate library function that should not panic
+    fn create_portable_logger() -> Result<AppPath, AppPathError> {
+        try_app_path!("logs/app.log", env = "LOG_FILE")
+    }
+
+    fn create_config_manager() -> Result<(AppPath, AppPath), AppPathError> {
+        let config = try_app_path!("config.toml", env = "APP_CONFIG")?;
+        let cache = try_app_path!("cache", env = "APP_CACHE")?;
+        Ok((config, cache))
+    }
+
+    // These should work without panicking
+    assert!(create_portable_logger().is_ok());
+    assert!(create_config_manager().is_ok());
+}
+
+#[test]
+fn test_try_app_path_macro_syntax_variants() {
+    // Test all syntax variants work
+    let simple = try_app_path!("simple.toml");
+    assert!(simple.is_ok());
+
+    let with_env = try_app_path!("default.toml", env = "NONEXISTENT_VAR");
+    assert!(with_env.is_ok());
+
+    let with_override = try_app_path!("default.toml", override = None::<String>);
+    assert!(with_override.is_ok());
+
+    let with_some_override = try_app_path!("default.toml", override = Some("custom.toml"));
+    assert!(with_some_override.is_ok());
 }

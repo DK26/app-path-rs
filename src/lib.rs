@@ -131,3 +131,138 @@ macro_rules! app_path {
         $crate::AppPath::with_override($path, $override_expr)
     };
 }
+
+/// Fallible version of [`app_path!`] that returns a [`Result`] instead of panicking.
+///
+/// This macro provides the same convenient syntax as [`app_path!`] but returns
+/// [`Result<AppPath, AppPathError>`] for explicit error handling. Perfect for
+/// libraries and applications that need graceful error handling.
+///
+/// # Syntax
+///
+/// - `try_app_path!(path)` - Simple path creation (equivalent to `AppPath::try_new(path)`)
+/// - `try_app_path!(path, env = "VAR_NAME")` - With environment variable override
+/// - `try_app_path!(path, override = expression)` - With any optional override expression
+///
+/// # Examples
+///
+/// ## Basic Usage
+///
+/// ```rust
+/// use app_path::{try_app_path, AppPathError};
+///
+/// fn setup_config() -> Result<(), AppPathError> {
+///     let config = try_app_path!("config.toml")?;
+///     let database = try_app_path!("data/users.db")?;
+///     
+///     // Use paths normally
+///     if config.exists() {
+///         println!("Config found at: {}", config.display());
+///     }
+///     
+///     Ok(())
+/// }
+/// ```
+///
+/// ## Environment Variable Overrides
+///
+/// ```rust
+/// use app_path::try_app_path;
+///
+/// fn setup_logging() -> Result<(), Box<dyn std::error::Error>> {
+///     // Uses "logs/app.log" by default, LOG_PATH env var if set
+///     let log_file = try_app_path!("logs/app.log", env = "LOG_PATH")?;
+///     log_file.ensure_parent_dirs()?;
+///     
+///     std::fs::write(&log_file, "Application started")?;
+///     Ok(())
+/// }
+/// ```
+///
+/// ## Custom Override Logic
+///
+/// ```rust
+/// use app_path::try_app_path;
+///
+/// fn get_data_dir() -> Option<String> {
+///     std::env::var("XDG_DATA_HOME")
+///         .or_else(|_| std::env::var("HOME").map(|h| format!("{}/.local/share", h)))
+///         .ok()
+/// }
+///
+/// fn setup_data() -> Result<(), Box<dyn std::error::Error>> {
+///     let data_dir = try_app_path!("data", override = get_data_dir())?;
+///     data_dir.ensure_dir_exists()?;
+///     Ok(())
+/// }
+/// ```
+///
+/// ## Error Handling Patterns
+///
+/// ```rust
+/// use app_path::{try_app_path, AppPathError};
+///
+/// match try_app_path!("config.toml") {
+///     Ok(config) => {
+///         println!("Config path: {}", config.display());
+///     }
+///     Err(AppPathError::ExecutableNotFound(msg)) => {
+///         eprintln!("Cannot determine executable location: {}", msg);
+///     }
+///     Err(AppPathError::InvalidExecutablePath(msg)) => {
+///         eprintln!("Invalid executable path: {}", msg);
+///     }
+/// }
+/// ```
+///
+/// ## Library Usage
+///
+/// ```rust
+/// use app_path::{try_app_path, AppPathError};
+///
+/// /// Library function that gracefully handles path errors
+/// pub fn load_user_config() -> Result<String, Box<dyn std::error::Error>> {
+///     let config_path = try_app_path!("config.toml", env = "USER_CONFIG")?;
+///         
+///     if !config_path.exists() {
+///         return Err("Config file not found".into());
+///     }
+///     
+///     let content = std::fs::read_to_string(&config_path)?;
+///     Ok(content)
+/// }
+/// ```
+///
+/// # Comparison with [`app_path!`]
+///
+/// | Feature | [`app_path!`] | [`try_app_path!`] |
+/// |---------|---------------|-------------------|
+/// | **Return type** | [`AppPath`] | [`Result<AppPath, AppPathError>`] |
+/// | **Error handling** | Panics on failure | Returns [`Err`] on failure |
+/// | **Use case** | Applications | Libraries, explicit error handling |
+/// | **Syntax** | Same | Same |
+/// | **Performance** | Same | Same |
+///
+/// # When to Use
+///
+/// - **Use [`try_app_path!`]** for libraries, when you need graceful error handling,
+///   or when integrating with other fallible operations
+/// - **Use [`app_path!`]** for applications where you want to fail fast on system errors
+///
+/// # See Also
+///
+/// - [`app_path!`] - Panicking version with identical syntax
+/// - [`AppPath::try_new`] - Constructor equivalent
+/// - [`AppPath::try_with_override`] - Constructor with override equivalent
+#[macro_export]
+macro_rules! try_app_path {
+    ($path:expr) => {
+        $crate::AppPath::try_new($path)
+    };
+    ($path:expr, env = $env_var:expr) => {
+        $crate::AppPath::try_with_override($path, ::std::env::var($env_var).ok())
+    };
+    ($path:expr, override = $override_expr:expr) => {
+        $crate::AppPath::try_with_override($path, $override_expr)
+    };
+}
