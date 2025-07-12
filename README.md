@@ -23,7 +23,8 @@ if config.exists() {
 
 // Environment override magic for deployment ✨
 let logs = app_path!("logs/app.log", env = "LOG_PATH");
-database.ensure_parent_dirs()?; // Creates data/ directory
+// → Uses LOG_PATH if set, otherwise /path/to/exe/logs/app.log
+database.ensure_parent_dirs()?; // Creates data/ directory if it doesn't exist
 ```
 
 ## Why Choose AppPath?
@@ -43,11 +44,15 @@ use app_path::app_path;
 
 // Simple paths
 let config = app_path!("config.toml");
+// → /path/to/exe/config.toml
 let database = app_path!("data/users.db");
+// → /path/to/exe/data/users.db
 
 // Environment variable overrides for deployment
 let logs = app_path!("logs/app.log", env = "LOG_PATH");
+// → Uses LOG_PATH if set, otherwise /path/to/exe/logs/app.log
 let cache = app_path!("cache", env = "CACHE_DIR");
+// → Uses CACHE_DIR if set, otherwise /path/to/exe/cache
 
 // Custom override logic with block expression
 let data_dir = app_path!("data", override = {
@@ -55,6 +60,7 @@ let data_dir = app_path!("data", override = {
         .or_else(|_| std::env::var("XDG_DATA_HOME").map(|p| format!("{p}/myapp")))
         .ok()
 });
+// → Uses DATA_DIR, then XDG_DATA_HOME/myapp, finally /path/to/exe/data
 
 // Function-based override (great for XDG support)
 let config_dir = app_path!("config", fn = || {
@@ -62,9 +68,18 @@ let config_dir = app_path!("config", fn = || {
         .or_else(|_| std::env::var("HOME").map(|h| format!("{h}/.config/myapp")))
         .ok()
 });
+// → /home/user/.config/myapp (Linux) or /path/to/exe/config (fallback)
 
 // Simple override with optional value
 let config = app_path!("config.toml", override = std::env::var("CONFIG_PATH").ok());
+// → Uses CONFIG_PATH if set, otherwise /path/to/exe/config.toml
+
+// Variable capturing in complex expressions
+let version = "1.0";
+let versioned_cache = app_path!(format!("cache-{}", version));
+// → /path/to/exe/cache-1.0
+let temp_with_env = app_path!(format!("temp-{}", version), env = "TEMP_DIR");
+// → Uses TEMP_DIR if set, otherwise /path/to/exe/temp-1.0
 
 // Directory creation with clear intent
 logs.ensure_parent_dirs()?;              // Creates logs/ for the file
@@ -80,13 +95,25 @@ use app_path::{try_app_path, AppPathError};
 
 // Returns Result<AppPath, AppPathError> instead of panicking
 let config = try_app_path!("config.toml")?;
+// → Ok(/path/to/exe/config.toml) or Err(AppPathError)
+
 let database = try_app_path!("data/users.db", env = "DATABASE_PATH")?;
+// → Ok with DATABASE_PATH or default path, or Err(AppPathError)
+
+// Variable capturing with error handling
+let version = "1.0";
+let versioned_cache = try_app_path!(format!("cache-{}", version))?;
+// → Ok(/path/to/exe/cache-1.0) or Err(AppPathError)
+
+let temp_with_env = try_app_path!(format!("temp-{}", version), env = "TEMP_DIR")?;
+// → Ok with TEMP_DIR or default path, or Err(AppPathError)
 
 // Same syntax, graceful error handling
 match try_app_path!("logs/app.log") {
     Ok(log_path) => log_path.ensure_parent_dirs()?,
     Err(e) => eprintln!("Failed to determine log path: {}", e),
 }
+// → Either creates logs/ directory or prints error message
 ```
 
 ### Constructor API (Alternative)
@@ -95,10 +122,14 @@ match try_app_path!("logs/app.log") {
 use app_path::AppPath;
 
 let config = AppPath::new("config.toml");
+// → /path/to/exe/config.toml (panics on system failure)
+
 let database = AppPath::with_override("data/users.db", std::env::var("DB_PATH").ok());
+// → Uses DB_PATH if set, otherwise /path/to/exe/data/users.db
 
 // For libraries requiring fallible behavior
 let config = AppPath::try_new("config.toml")?;
+// → Ok(/path/to/exe/config.toml) or Err(AppPathError)
 ```
 
 ## Real-World Examples

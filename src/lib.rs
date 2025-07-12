@@ -5,37 +5,74 @@
 //! ## Quick Start
 //!
 //! ```rust
-//! use app_path::{AppPath, app_path};
+//! use app_path::{AppPath, app_path, try_app_path};
 //!
-//! // Files relative to your executable
-//! let config = AppPath::new("config.toml");
-//! let database = AppPath::new("data/users.db");
-//! let logs = AppPath::new("logs/app.log");
+//! // Simple macro usage - files relative to your executable
+//! let config = app_path!("config.toml");        // → /path/to/exe/config.toml
+//! let database = app_path!("data/users.db");    // → /path/to/exe/data/users.db
+//! let logs = app_path!("logs/app.log");         // → /path/to/exe/logs/app.log
 //!
-//! // Or use the convenient macro
-//! let config_alt = app_path!("config.toml");
-//! let database_alt = app_path!("data/users.db");
-//! let logs_alt = app_path!("logs/app.log");
+//! // Environment variable overrides for deployment
+//! let config_deploy = app_path!("config.toml", env = "CONFIG_PATH");
+//! // → Uses CONFIG_PATH if set, otherwise /path/to/exe/config.toml
 //!
-//! // Environment variable overrides for deployment flexibility
-//! let config_deploy = AppPath::with_override("config.toml", std::env::var("CONFIG_PATH").ok());
-//! let database_deploy = app_path!("data/users.db", env = "DATABASE_PATH");
-//! let logs_deploy = app_path!("logs/app.log", override = std::env::var("LOG_DIR").ok());
+//! let db_deploy = app_path!("data/users.db", override = std::env::var("DATABASE_PATH").ok());
+//! // → Uses DATABASE_PATH if set, otherwise /path/to/exe/data/users.db
 //!
-//! // Works like standard paths
+//! // Advanced override patterns for XDG/system integration
+//! let config_xdg = app_path!("config", fn = || {
+//!     std::env::var("XDG_CONFIG_HOME")
+//!         .or_else(|_| std::env::var("HOME").map(|h| format!("{h}/.config/myapp")))
+//!         .ok()
+//! });
+//! // → /home/user/.config/myapp (Linux) or /path/to/exe/config (fallback)
+//!
+//! // Complex override logic with block expressions
+//! let data_dir = app_path!("data", override = {
+//!     std::env::var("DATA_DIR")
+//!         .or_else(|_| std::env::var("XDG_DATA_HOME").map(|p| format!("{p}/myapp")))
+//!         .ok()
+//! });
+//! // → Uses DATA_DIR, then XDG_DATA_HOME/myapp, finally /path/to/exe/data
+//!
+//! // Variable capturing in complex expressions
+//! let version = "1.0";
+//! let versioned_cache = app_path!(format!("cache-{version}"));
+//! // → /path/to/exe/cache-1.0
+//!
+//! let temp_with_env = app_path!(format!("temp-{version}"), env = "TEMP_DIR");
+//! // → Uses TEMP_DIR if set, otherwise /path/to/exe/temp-1.0
+//!
+//! // Fallible variants for libraries (return Result instead of panicking)
+//! let config_safe = try_app_path!("config.toml")?;
+//! // → Ok(/path/to/exe/config.toml) or Err(AppPathError)
+//!
+//! let db_safe = try_app_path!("data/users.db", env = "DATABASE_PATH")?;
+//! // → Ok with DATABASE_PATH or default path, or Err(AppPathError)
+//!
+//! let cache_safe = try_app_path!(format!("cache-{version}"))?;
+//! // → Ok(/path/to/exe/cache-1.0) or Err(AppPathError)
+//!
+//! // Constructor API (alternative to macros)
+//! let traditional = AppPath::new("config.toml");
+//! // → /path/to/exe/config.toml (panics on system failure)
+//!
+//! let with_override = AppPath::with_override("config.toml", std::env::var("CONFIG_PATH").ok());
+//! // → Uses CONFIG_PATH if set, otherwise /path/to/exe/config.toml
+//!
+//! let fallible = AppPath::try_new("config.toml")?; // For libraries
+//! // → Ok(/path/to/exe/config.toml) or Err(AppPathError)
+//!
+//! // Works like standard paths - auto-derefs to &Path
 //! if config.exists() {
 //!     let content = std::fs::read_to_string(&config)?;
+//!     // → Reads file content if config.toml exists
 //! }
 //!
-//! // Create directories with clear intent
-//! logs.ensure_parent_dirs()?; // Creates logs/ directory for the file
-//! database.ensure_parent_dirs()?; // Creates data/ directory for the file
-//!
-//! // Create directories themselves
-//! let cache_dir = AppPath::new("cache");
-//! let temp_dir = AppPath::new("temp");
-//! cache_dir.ensure_dir_exists()?; // Creates cache/ directory
-//! temp_dir.ensure_dir_exists()?; // Creates temp/ directory
+//! // Directory creation with clear intent
+//! logs.ensure_parent_dirs()?;                    // Creates logs/ directory for the file
+//! app_path!("cache").ensure_dir_exists()?;       // Creates cache/ directory itself
+//! // → Both create directories if they don't exist
 //! # Ok::<(), Box<dyn std::error::Error>>(())
 //! ```
 //!
@@ -66,9 +103,52 @@
 //!
 //! | Panicking (Recommended) | Fallible (Libraries) | Use Case |
 //! |------------------------|---------------------|----------|
-//! | [`AppPath::new()`] | [`AppPath::try_new()`] | Most applications vs. libraries |
+//! | [`AppPath::new()`] | [`AppPath::try_new()`] | Constructor methods |
 //! | [`app_path!`] | [`try_app_path!`] | Convenient macros |
 //! | [`exe_dir()`] | [`try_exe_dir()`] | Direct directory access |
+//!
+//! ### Macro Syntax Variants
+//!
+//! Both `app_path!` and `try_app_path!` macros support four syntax forms for maximum flexibility:
+//!
+//! ```rust
+//! # use app_path::{app_path, try_app_path};
+//! // 1. Direct value
+//! let config = app_path!("config.toml");
+//! // → /path/to/exe/config.toml
+//!
+//! // 2. With environment override
+//! let config = app_path!("config.toml", env = "CONFIG_PATH");
+//! // → Uses CONFIG_PATH if set, otherwise /path/to/exe/config.toml
+//!
+//! // 3. With optional override value
+//! let config = app_path!("config.toml", override = std::env::var("CONFIG_PATH").ok());
+//! // → Uses CONFIG_PATH if available, otherwise /path/to/exe/config.toml
+//!
+//! // 4. With function-based override
+//! let config = app_path!("config.toml", fn = || {
+//!     std::env::var("CONFIG_PATH").ok()
+//! });
+//! // → Uses function result if Some, otherwise /path/to/exe/config.toml
+//! ```
+//!
+//! ### Variable Capturing
+//!
+//! Both macros support variable capturing in complex expressions:
+//!
+//! ```rust
+//! # use app_path::{app_path, try_app_path};
+//! let version = "1.0";
+//! let cache = app_path!(format!("cache-{version}")); // Captures `version`
+//! // → /path/to/exe/cache-1.0
+//!
+//! // Useful in closures and async blocks
+//! async fn process_data(id: u32) {
+//!     let output = app_path!(format!("output-{id}.json")); // Captures `id`
+//!     // → /path/to/exe/output-123.json (where id = 123)
+//!     // ... async processing
+//! }
+//! ```
 //!
 //! ### Panic Conditions
 //!
@@ -238,10 +318,10 @@ macro_rules! app_path {
 ///         println!("Config path: {}", config.display());
 ///     }
 ///     Err(AppPathError::ExecutableNotFound(msg)) => {
-///         eprintln!("Cannot determine executable location: {}", msg);
+///         eprintln!("Cannot determine executable location: {msg}");
 ///     }
 ///     Err(AppPathError::InvalidExecutablePath(msg)) => {
-///         eprintln!("Invalid executable path: {}", msg);
+///         eprintln!("Invalid executable path: {msg}");
 ///     }
 /// }
 /// ```

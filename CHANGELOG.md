@@ -7,6 +7,49 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.3] - 2025-01-24
+
+### Added
+- **Fallible macro variant** - New `try_app_path!` macro for error handling scenarios
+  - Returns `Result<AppPath, Box<dyn std::error::Error>>` instead of panicking
+  - Same four syntax variants as `app_path!` macro
+  - Perfect for library code and applications requiring graceful error handling
+- **Complete function variant coverage** - Added missing `_fn` variants for all macros
+  - `app_path_fn!` and `try_app_path_fn!` for capturing scope issues
+  - Essential for closures, async blocks, and complex control flow scenarios
+  - Maintains API symmetry and completeness
+
+### Enhanced
+- **Documentation completeness** - Comprehensive updates to all documentation
+  - Added examples for all `_fn` macro variants throughout README.md
+  - Corrected documentation about override parameter availability in macros
+  - Updated API design section with complete coverage of all variants
+  - All 140 tests (88 unit + 52 doc tests) pass with comprehensive coverage
+- **Cross-platform CI tooling** - New `ci-local.sh` script for local development
+  - Supports Windows (PowerShell/Git Bash), macOS, and Linux
+  - Runs format, clippy, compile, test, and documentation checks
+  - Auto-detects cargo installation and provides clear error reporting
+- **Developer experience** - Updated CONTRIBUTING.md with modern development workflow
+  - Clear setup instructions for all platforms
+  - Integration with new CI script for consistent testing
+  - Improved code quality guidelines and testing requirements
+
+### Fixed
+- **Test reliability** - Corrected XDG environment variable test logic
+  - Fixed false positive when XDG variables weren't properly isolated
+  - Enhanced test coverage for realistic XDG directory scenarios
+  - All tests now pass consistently across platforms
+
+### Documentation
+- **Macro examples** - Complete examples for all four macro syntax variants
+  - Direct value: `app_path!("com.example.app")`
+  - With override: `app_path!("com.example.app", "/custom/path")`
+  - Field access: `app_path!(value, cache_dir)`
+  - Complex expressions: `app_path!(format!("app-{}", version))`
+- **Error handling patterns** - Comprehensive `try_app_path!` usage examples
+- **API symmetry documentation** - Clear explanation of panicking vs fallible variants
+- **Real-world usage patterns** - Practical examples for different application scenarios
+
 ## [0.2.2] - 2025-07-10
 
 ### Added
