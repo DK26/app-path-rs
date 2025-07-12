@@ -5,12 +5,22 @@
 //! ## Quick Start
 //!
 //! ```rust
-//! use app_path::AppPath;
+//! use app_path::{AppPath, app_path};
 //!
 //! // Files relative to your executable
 //! let config = AppPath::new("config.toml");
 //! let database = AppPath::new("data/users.db");
 //! let logs = AppPath::new("logs/app.log");
+//!
+//! // Or use the convenient macro
+//! let config_alt = app_path!("config.toml");
+//! let database_alt = app_path!("data/users.db");
+//! let logs_alt = app_path!("logs/app.log");
+//!
+//! // Environment variable overrides for deployment flexibility
+//! let config_deploy = AppPath::with_override("config.toml", std::env::var("CONFIG_PATH").ok());
+//! let database_deploy = app_path!("data/users.db", env = "DATABASE_PATH");
+//! let logs_deploy = app_path!("logs/app.log", override = std::env::var("LOG_DIR").ok());
 //!
 //! // Works like standard paths
 //! if config.exists() {
@@ -20,6 +30,12 @@
 //! // Create directories with clear intent
 //! logs.ensure_parent_dirs()?; // Creates logs/ directory for the file
 //! database.ensure_parent_dirs()?; // Creates data/ directory for the file
+//!
+//! // Create directories themselves
+//! let cache_dir = AppPath::new("cache");
+//! let temp_dir = AppPath::new("temp");
+//! cache_dir.ensure_dir_exists()?; // Creates cache/ directory
+//! temp_dir.ensure_dir_exists()?; // Creates temp/ directory
 //! # Ok::<(), Box<dyn std::error::Error>>(())
 //! ```
 //!
@@ -36,6 +52,7 @@
 //! - [`AppPath::new()`] - **Recommended**: Simple constructor (panics on failure)
 //! - [`AppPath::try_new()`] - **Libraries**: Fallible version for error handling
 //! - [`AppPath::with_override()`] - **Deployment**: Environment-configurable paths
+//! - [`app_path!`] - **Macro**: Convenient syntax with optional environment overrides
 //! - [`AppPath::ensure_parent_dirs()`] - **Files**: Creates parent directories for files
 //! - [`AppPath::ensure_dir_exists()`] - **Directories**: Creates directories (and parents)
 //! - [`exe_dir()`] - **Advanced**: Direct access to executable directory (panics on failure)
