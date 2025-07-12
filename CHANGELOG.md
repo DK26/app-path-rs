@@ -7,6 +7,55 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.3] - 2025-01-24
+
+### Added
+- **Fallible macro variant** - New `try_app_path!` macro for error handling scenarios
+  - Returns `Result<AppPath, AppPathError>` instead of panicking
+  - Same four syntax variants as `app_path!` macro
+  - Perfect for library code and applications requiring graceful error handling
+- **Complete macro coverage** - All macro variants support the same four syntax forms
+  - Direct value: `app_path!("com.example.app")` and `try_app_path!("com.example.app")`
+  - Environment override: `app_path!("com.example.app", env_var)` and `try_app_path!("com.example.app", env_var)`
+  - Optional override: `app_path!("com.example.app", option_value)` and `try_app_path!("com.example.app", option_value)`
+  - Function-based override: `app_path_fn!(|| "dynamic")` and `try_app_path_fn!(|| "dynamic")`
+  - Essential for closures, async blocks, and complex control flow scenarios
+  - Maintains API symmetry and completeness between panicking and fallible variants
+
+### Enhanced
+- **Documentation completeness** - Comprehensive updates to all documentation
+  - Added clear output examples throughout README.md showing exact generated paths
+  - Enhanced Quick Start section with → comments demonstrating actual results
+  - Updated all macro documentation with practical examples and expected outputs
+  - Added examples for all `_fn` macro variants throughout README.md
+  - Corrected documentation about override parameter availability in macros
+  - Updated API design section with complete coverage of all variants
+  - All 142 tests (88 unit + 54 doc tests) pass with comprehensive coverage
+- **Cross-platform CI tooling** - New `ci-local.sh` script for local development
+  - Supports Windows (PowerShell/Git Bash), macOS, and Linux
+  - Runs format, clippy, compile, test, and documentation checks
+  - Auto-detects cargo installation and provides clear error reporting
+- **Developer experience** - Updated CONTRIBUTING.md with modern development workflow
+  - Clear setup instructions for all platforms
+  - Integration with new CI script for consistent testing
+  - Improved code quality guidelines and testing requirements
+
+### Fixed
+- **Test reliability** - Corrected XDG environment variable test logic
+  - Fixed false positive when XDG variables weren't properly isolated
+  - Enhanced test coverage for realistic XDG directory scenarios
+  - All tests now pass consistently across platforms
+
+### Documentation
+- **Macro examples** - Complete examples for all four macro syntax variants
+  - Direct value: `app_path!("com.example.app")`
+  - With override: `app_path!("com.example.app", "/custom/path")`
+  - Field access: `app_path!(value, cache_dir)`
+  - Complex expressions: `app_path!(format!("app-{}", version))`
+- **Error handling patterns** - Comprehensive `try_app_path!` usage examples
+- **API symmetry documentation** - Clear explanation of panicking vs fallible variants
+- **Real-world usage patterns** - Practical examples for different application scenarios
+
 ## [0.2.2] - 2025-07-10
 
 ### Added

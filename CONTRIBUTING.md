@@ -1,6 +1,14 @@
 # Contributing to app-path
 
 Thanks for your interest in contributing! 🦀
+
+## Quick Start
+
+1. **Fork** the repository
+2. **Clone** your fork: `git clone https://github.com/YOUR_USERNAME/app-path-rs.git`
+3. **Test** locally: `./ci-local.sh` (runs all CI checks)
+4. **Submit** a pull request
+
 ## How to Contribute
 
 - **🐛 Bug reports**: [Open an issue](https://github.com/DK26/app-path-rs/issues) with reproduction steps
@@ -10,55 +18,63 @@ Thanks for your interest in contributing! 🦀
 
 ## Development
 
+### Local Testing
+
 ```bash
-cargo test          # Run tests
-cargo fmt           # Format code  
-cargo clippy        # Check for issues
+# Run all CI checks locally (recommended)
+./ci-local.sh
+
+# Or run individual checks
+cargo fmt --check    # Format check
+cargo clippy         # Linting
+cargo test           # Unit tests
+cargo test --doc     # Documentation tests
+cargo doc            # Build docs
 ```
 
-## Guidelines
+### Guidelines
 
-### Code Quality
-- All tests must pass
+**Code Quality:**
+- All tests must pass (`./ci-local.sh`)
 - No clippy warnings
 - Follow `cargo fmt` style
 - Add tests for new features
 
-### Project Philosophy
+**Project Philosophy:**
 - **Simple API** - Easy to use, hard to misuse
-- **Zero dependencies** - Keep it lightweight
+- **Zero dependencies** - Keep it lightweight  
 - **Cross-platform** - Windows, Linux, macOS
 - **Reliable** - Predictable behavior everywhere
 
 ## Pull Requests
 
-1. Fork and create a feature branch
-2. Write tests for your changes
-3. Ensure `cargo test && cargo clippy` passes
-4. Submit PR with clear description
+1. **Fork** and create a feature branch
+2. **Write tests** for your changes
+3. **Run CI locally**: `./ci-local.sh`
+4. **Submit PR** with clear description
 
-**Note**: All PRs automatically run our CI pipeline which tests on Windows, Linux, and macOS with multiple Rust versions.
+All PRs automatically run CI on Windows, Linux, and macOS.
 
-### What We Want ✅
-- Bug fixes
-- Performance improvements
-- Better error handling
-- Documentation improvements
+## What We Want ✅
 
-### What We Don't Want ❌
-- Complex APIs
-- New dependencies (Unless presenting a strong case)
+- Bug fixes and performance improvements
+- Better error handling and documentation
+- Cross-platform compatibility fixes
+- Additional tests and examples
+
+## What We Don't Want ❌
+
+- Complex APIs or breaking changes (discuss first)
+- New dependencies (unless strongly justified)
 - Platform-specific features
-- Breaking changes without discussion
 
 ## License
 
-By contributing to this project, you agree that your contributions will be licensed under the same terms as the project: **MIT OR Apache-2.0**.
+By contributing, you agree that your contributions will be licensed under **MIT OR Apache-2.0**.
 
 You confirm that:
 - You have the right to submit your contribution
 - Your contribution is your original work or properly attributed
-- You understand your contribution may be redistributed under these licenses
 
 ## Getting Help
 
