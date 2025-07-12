@@ -11,20 +11,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - **Fallible macro variant** - New `try_app_path!` macro for error handling scenarios
-  - Returns `Result<AppPath, Box<dyn std::error::Error>>` instead of panicking
+  - Returns `Result<AppPath, AppPathError>` instead of panicking
   - Same four syntax variants as `app_path!` macro
   - Perfect for library code and applications requiring graceful error handling
-- **Complete function variant coverage** - Added missing `_fn` variants for all macros
-  - `app_path_fn!` and `try_app_path_fn!` for capturing scope issues
+- **Complete macro coverage** - All macro variants support the same four syntax forms
+  - Direct value: `app_path!("com.example.app")` and `try_app_path!("com.example.app")`
+  - Environment override: `app_path!("com.example.app", env_var)` and `try_app_path!("com.example.app", env_var)`
+  - Optional override: `app_path!("com.example.app", option_value)` and `try_app_path!("com.example.app", option_value)`
+  - Function-based override: `app_path_fn!(|| "dynamic")` and `try_app_path_fn!(|| "dynamic")`
   - Essential for closures, async blocks, and complex control flow scenarios
-  - Maintains API symmetry and completeness
+  - Maintains API symmetry and completeness between panicking and fallible variants
 
 ### Enhanced
 - **Documentation completeness** - Comprehensive updates to all documentation
+  - Added clear output examples throughout README.md showing exact generated paths
+  - Enhanced Quick Start section with → comments demonstrating actual results
+  - Updated all macro documentation with practical examples and expected outputs
   - Added examples for all `_fn` macro variants throughout README.md
   - Corrected documentation about override parameter availability in macros
   - Updated API design section with complete coverage of all variants
-  - All 140 tests (88 unit + 52 doc tests) pass with comprehensive coverage
+  - All 142 tests (88 unit + 54 doc tests) pass with comprehensive coverage
 - **Cross-platform CI tooling** - New `ci-local.sh` script for local development
   - Supports Windows (PowerShell/Git Bash), macOS, and Linux
   - Runs format, clippy, compile, test, and documentation checks
