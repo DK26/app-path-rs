@@ -202,7 +202,7 @@ impl AppPath {
     /// ```
     #[deprecated(
         since = "0.2.2",
-        note = "Use `ensure_parent_dirs()` for file paths or `ensure_dir_exists()` for directory paths instead"
+        note = "Use `create_parents()` for file paths or `create_dir()` for directory paths instead"
     )]
     #[inline]
     pub fn create_dir_all(&self) -> std::io::Result<()> {

@@ -324,6 +324,9 @@ macro_rules! app_path {
 ///     Err(AppPathError::InvalidExecutablePath(msg)) => {
 ///         eprintln!("Invalid executable path: {msg}");
 ///     }
+///     Err(AppPathError::IoError(msg)) => {
+///         eprintln!("I/O operation failed: {msg}");
+///     }
 /// }
 /// ```
 ///

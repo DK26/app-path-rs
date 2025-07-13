@@ -1,4 +1,4 @@
-use crate::AppPath;
+use crate::{AppPath, AppPathError};
 
 impl AppPath {
     /// Creates parent directories needed for this file path.
@@ -57,15 +57,14 @@ impl AppPath {
     /// assert!(temp_dir.join("data/users").exists());
     ///
     /// # std::fs::remove_dir_all(&temp_dir).ok();
-    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// # Ok::<(), app_path::AppPathError>(())
     /// ```
     #[inline]
-    pub fn create_parents(&self) -> std::io::Result<()> {
+    pub fn create_parents(&self) -> Result<(), AppPathError> {
         if let Some(parent) = self.full_path.parent() {
-            std::fs::create_dir_all(parent)
-        } else {
-            Ok(())
+            std::fs::create_dir_all(parent)?;
         }
+        Ok(())
     }
 
     /// Creates this path as a directory, including all parent directories.
@@ -183,10 +182,11 @@ impl AppPath {
     /// assert!(dir_path.is_dir()); // and it's definitely a directory
     ///
     /// # std::fs::remove_dir_all(&temp_dir).ok();
-    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// # Ok::<(), app_path::AppPathError>(())
     /// ```
     #[inline]
-    pub fn create_dir(&self) -> std::io::Result<()> {
-        std::fs::create_dir_all(self.path())
+    pub fn create_dir(&self) -> Result<(), AppPathError> {
+        std::fs::create_dir_all(self.path())?;
+        Ok(())
     }
 }
