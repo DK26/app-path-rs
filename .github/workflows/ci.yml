@@ -1,4 +1,7 @@
 name: CI
+# 
+# This workflow runs CI checks on GitHub Actions.
+# For local development with auto-fixing, use: bash ci-local.sh
 
 on:
   push:
@@ -47,8 +50,24 @@ jobs:
     - name: Check formatting
       run: cargo fmt --all -- --check
 
+    - name: Show formatting diff (if check failed)
+      if: failure()
+      run: |
+        echo "❌ Formatting check failed. Run 'cargo fmt --all' to fix."
+        echo "Here's what would be changed:"
+        cargo fmt --all -- --check --verbose || true
+        echo ""
+        echo "To fix locally, run: cargo fmt --all"
+
     - name: Run clippy
       run: cargo clippy --all-targets --all-features -- -D warnings
+
+    - name: Show clippy fixes (if check failed)  
+      if: failure()
+      run: |
+        echo "❌ Clippy check failed. Some issues might be auto-fixable."
+        echo "To fix locally, run: cargo clippy --fix --allow-dirty --allow-staged --all-targets --all-features"
+        echo "Then run: cargo clippy --all-targets --all-features -- -D warnings"
 
     - name: Run tests
       run: cargo test --verbose

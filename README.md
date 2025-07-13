@@ -24,7 +24,7 @@ if config.exists() {
 // Environment override magic for deployment ✨
 let logs = app_path!("logs/app.log", env = "LOG_PATH");
 // → Uses LOG_PATH if set, otherwise /path/to/exe/logs/app.log
-database.ensure_parent_dirs()?; // Creates data/ directory if it doesn't exist
+database.create_parents()?; // Creates data/ directory if it doesn't exist
 ```
 
 ## Why Choose AppPath?
@@ -76,14 +76,14 @@ let config = app_path!("config.toml", override = std::env::var("CONFIG_PATH").ok
 
 // Variable capturing in complex expressions
 let version = "1.0";
-let versioned_cache = app_path!(format!("cache-{}", version));
+let versioned_cache = app_path!(format!("cache-{version}"));
 // → /path/to/exe/cache-1.0
-let temp_with_env = app_path!(format!("temp-{}", version), env = "TEMP_DIR");
+let temp_with_env = app_path!(format!("temp-{version}"), env = "TEMP_DIR");
 // → Uses TEMP_DIR if set, otherwise /path/to/exe/temp-1.0
 
 // Directory creation with clear intent
-logs.ensure_parent_dirs()?;              // Creates logs/ for the file
-app_path!("temp").ensure_dir_exists()?;  // Creates temp/ directory itself
+logs.create_parents()?;              // Creates logs/ for the file
+app_path!("temp").create_dir()?;  // Creates temp/ directory itself
 ```
 
 ### Fallible `try_app_path!` Macro (Libraries)
@@ -102,16 +102,16 @@ let database = try_app_path!("data/users.db", env = "DATABASE_PATH")?;
 
 // Variable capturing with error handling
 let version = "1.0";
-let versioned_cache = try_app_path!(format!("cache-{}", version))?;
+let versioned_cache = try_app_path!(format!("cache-{version}"))?;
 // → Ok(/path/to/exe/cache-1.0) or Err(AppPathError)
 
-let temp_with_env = try_app_path!(format!("temp-{}", version), env = "TEMP_DIR")?;
+let temp_with_env = try_app_path!(format!("temp-{version}"), env = "TEMP_DIR")?;
 // → Ok with TEMP_DIR or default path, or Err(AppPathError)
 
 // Same syntax, graceful error handling
 match try_app_path!("logs/app.log") {
     Ok(log_path) => log_path.ensure_parent_dirs()?,
-    Err(e) => eprintln!("Failed to determine log path: {}", e),
+    Err(e) => eprintln!("Failed to determine log path: {e}"),
 }
 // → Either creates logs/ directory or prints error message
 ```
@@ -158,7 +158,7 @@ fn process_templates(name: &str) -> Result<(), Box<dyn std::error::Error>> {
     let template = app_path!("templates").join(format!("{name}.hbs"));
     let output = app_path!("output", env = "OUTPUT_DIR").join("result.html");
     
-    output.ensure_parent_dirs()?; // Creates output/ directory
+    output.create_parents()?; // Creates output/ directory
     
     let content = std::fs::read_to_string(&template)?;
     std::fs::write(&output, render_template(&content)?)?;
@@ -187,20 +187,20 @@ let logs = if cfg!(debug_assertions) {
 
 AppPath provides intuitive methods with clear intent:
 
-- **`ensure_parent_dirs()`** - Creates parent directories for file paths
-- **`ensure_dir_exists()`** - Creates the path as a directory
+- **`create_parents()`** - Creates parent directories for file paths
+- **`create_dir()`** - Creates the path as a directory
 
 ```rust
 use app_path::app_path;
 
 // Preparing to write files
 let log_file = app_path!("logs/app.log");
-log_file.ensure_parent_dirs()?; // Creates logs/ directory
+log_file.create_parents()?; // Creates logs/ directory
 std::fs::write(&log_file, "Starting app...")?;
 
 // Creating directories
 let cache_dir = app_path!("cache");
-cache_dir.ensure_dir_exists()?; // Creates cache/ directory
+cache_dir.create_dir()?; // Creates cache/ directory
 ```
 
 ## Path Resolution
@@ -219,10 +219,10 @@ use app_path::{AppPath, AppPathError};
 match AppPath::try_new("config.toml") {
     Ok(path) => println!("Config: {}", path.display()),
     Err(AppPathError::ExecutableNotFound(msg)) => {
-        eprintln!("Cannot find executable: {}", msg);
+        eprintln!("Cannot find executable: {msg}");
     }
     Err(AppPathError::InvalidExecutablePath(msg)) => {
-        eprintln!("Invalid executable path: {}", msg);
+        eprintln!("Invalid executable path: {msg}");
     }
 }
 ```

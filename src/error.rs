@@ -34,11 +34,11 @@ use std::path::PathBuf;
 ///         println!("Config path: {}", config.path().display());
 ///     }
 ///     Err(AppPathError::ExecutableNotFound(msg)) => {
-///         eprintln!("Cannot find executable: {}", msg);
+///         eprintln!("Cannot find executable: {msg}");
 ///         // Fallback to alternative configuration
 ///     }
 ///     Err(AppPathError::InvalidExecutablePath(msg)) => {
-///         eprintln!("Invalid executable path: {}", msg);
+///         eprintln!("Invalid executable path: {msg}");
 ///         // Fallback to alternative configuration
 ///     }
 /// }

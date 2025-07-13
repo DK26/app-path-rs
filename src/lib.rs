@@ -70,10 +70,11 @@
 //! }
 //!
 //! // Directory creation with clear intent
-//! logs.ensure_parent_dirs()?;                    // Creates logs/ directory for the file
-//! app_path!("cache").ensure_dir_exists()?;       // Creates cache/ directory itself
+//! logs.create_parents()?;                 // Creates logs/ directory for the file
+//! app_path!("cache").create_dir()?;       // Creates cache/ directory itself
 //! // → Both create directories if they don't exist
 //! # Ok::<(), Box<dyn std::error::Error>>(())
+//!
 //! ```
 //!
 //! ## Key Features
@@ -92,8 +93,8 @@
 //! - [`AppPath::with_override_fn()`] - **Advanced**: Function-based override logic
 //! - [`app_path!`] - **Macro**: Convenient syntax with optional environment overrides
 //! - [`try_app_path!`] - **Macro (Fallible)**: Returns `Result` for explicit error handling
-//! - [`AppPath::ensure_parent_dirs()`] - **Files**: Creates parent directories for files
-//! - [`AppPath::ensure_dir_exists()`] - **Directories**: Creates directories (and parents)
+//! - [`AppPath::create_parents()`] - **Files**: Creates parent directories for files
+//! - [`AppPath::create_dir()`] - **Directories**: Creates directories (and parents)
 //! - [`exe_dir()`] - **Advanced**: Direct access to executable directory (panics on failure)
 //! - [`try_exe_dir()`] - **Libraries**: Fallible executable directory access
 //!
@@ -267,7 +268,7 @@ macro_rules! app_path {
 /// fn setup_logging() -> Result<(), Box<dyn std::error::Error>> {
 ///     // Uses "logs/app.log" by default, LOG_PATH env var if set
 ///     let log_file = try_app_path!("logs/app.log", env = "LOG_PATH")?;
-///     log_file.ensure_parent_dirs()?;
+///     log_file.create_parents()?;
 ///     
 ///     std::fs::write(&log_file, "Application started")?;
 ///     Ok(())
@@ -287,7 +288,7 @@ macro_rules! app_path {
 ///
 /// fn setup_data() -> Result<(), Box<dyn std::error::Error>> {
 ///     let data_dir = try_app_path!("data", override = get_data_dir())?;
-///     data_dir.ensure_dir_exists()?;
+///     data_dir.create_dir()?;
 ///     Ok(())
 /// }
 /// ```
@@ -303,7 +304,7 @@ macro_rules! app_path {
 ///             .or_else(|_| std::env::var("HOME").map(|h| format!("{h}/.cache")))
 ///             .ok()
 ///     })?;
-///     cache_dir.ensure_dir_exists()?;
+///     cache_dir.create_dir()?;
 ///     Ok(())
 /// }
 /// ```
