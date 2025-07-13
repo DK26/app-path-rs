@@ -111,7 +111,7 @@ let temp_with_env = try_app_path!(format!("temp-{version}"), env = "TEMP_DIR")?;
 // Same syntax, graceful error handling
 match try_app_path!("logs/app.log") {
     Ok(log_path) => log_path.ensure_parent_dirs()?,
-    Err(e) => eprintln!("Failed to determine log path: {}", e),
+    Err(e) => eprintln!("Failed to determine log path: {e}"),
 }
 // → Either creates logs/ directory or prints error message
 ```
@@ -219,10 +219,10 @@ use app_path::{AppPath, AppPathError};
 match AppPath::try_new("config.toml") {
     Ok(path) => println!("Config: {}", path.display()),
     Err(AppPathError::ExecutableNotFound(msg)) => {
-        eprintln!("Cannot find executable: {}", msg);
+        eprintln!("Cannot find executable: {msg}");
     }
     Err(AppPathError::InvalidExecutablePath(msg)) => {
-        eprintln!("Invalid executable path: {}", msg);
+        eprintln!("Invalid executable path: {msg}");
     }
 }
 ```

@@ -70,7 +70,7 @@ pub fn exe_dir() -> &'static Path {
 ///         let config = exe_dir.join("config.toml");
 ///     }
 ///     Err(e) => {
-///         eprintln!("Failed to get executable directory: {}", e);
+///         eprintln!("Failed to get executable directory: {e}");
 ///         // Implement fallback strategy
 ///     }
 /// }
@@ -112,7 +112,7 @@ pub fn exe_dir() -> &'static Path {
 ///         // Use exe_dir for further operations
 ///     }
 ///     Err(e) => {
-///         eprintln!("Failed to get executable directory: {}", e);
+///         eprintln!("Failed to get executable directory: {e}");
 ///         // Implement fallback strategy
 ///     }
 /// }
