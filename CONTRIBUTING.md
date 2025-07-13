@@ -46,6 +46,14 @@ cargo doc            # Build docs
 - **Cross-platform** - Windows, Linux, macOS
 - **Reliable** - Predictable behavior everywhere
 
+## AI Prompt
+
+Copy-paste this when working with AI on this project:
+
+```
+Rules: Always run `bash ci-local.sh` before committing. Use modern string formatting in ALL string-building macros - put variables directly in braces like format!("Hello, {name}") instead of format!("Hello, {}", name). Never remove existing APIs or tests. Preserve all public interfaces.
+```
+
 ## Pull Requests
 
 1. **Fork** and create a feature branch
