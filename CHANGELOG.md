@@ -51,7 +51,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Direct value: `app_path!("com.example.app")`
   - With override: `app_path!("com.example.app", "/custom/path")`
   - Field access: `app_path!(value, cache_dir)`
-  - Complex expressions: `app_path!(format!("app-{}", version))`
+  - Complex expressions: `app_path!(format!("app-{version}"))`
 - **Error handling patterns** - Comprehensive `try_app_path!` usage examples
 - **API symmetry documentation** - Clear explanation of panicking vs fallible variants
 - **Real-world usage patterns** - Practical examples for different application scenarios

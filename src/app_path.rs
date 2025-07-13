@@ -192,7 +192,7 @@ impl AppPath {
     ///     AppPath::try_with_override_fn("config.toml", || {
     ///         std::env::var("APP_CONFIG").ok()
     ///             .or_else(|| std::env::var("CONFIG_FILE").ok())
-    ///             .or_else(|| std::env::var("XDG_CONFIG_HOME").ok().map(|dir| format!("{}/myapp/config.toml", dir)))
+    ///             .or_else(|| std::env::var("XDG_CONFIG_HOME").ok().map(|dir| format!("{dir}/myapp/config.toml")))
     ///     })
     /// }
     /// ```

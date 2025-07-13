@@ -76,9 +76,9 @@ let config = app_path!("config.toml", override = std::env::var("CONFIG_PATH").ok
 
 // Variable capturing in complex expressions
 let version = "1.0";
-let versioned_cache = app_path!(format!("cache-{}", version));
+let versioned_cache = app_path!(format!("cache-{version}"));
 // → /path/to/exe/cache-1.0
-let temp_with_env = app_path!(format!("temp-{}", version), env = "TEMP_DIR");
+let temp_with_env = app_path!(format!("temp-{version}"), env = "TEMP_DIR");
 // → Uses TEMP_DIR if set, otherwise /path/to/exe/temp-1.0
 
 // Directory creation with clear intent
@@ -102,10 +102,10 @@ let database = try_app_path!("data/users.db", env = "DATABASE_PATH")?;
 
 // Variable capturing with error handling
 let version = "1.0";
-let versioned_cache = try_app_path!(format!("cache-{}", version))?;
+let versioned_cache = try_app_path!(format!("cache-{version}"))?;
 // → Ok(/path/to/exe/cache-1.0) or Err(AppPathError)
 
-let temp_with_env = try_app_path!(format!("temp-{}", version), env = "TEMP_DIR")?;
+let temp_with_env = try_app_path!(format!("temp-{version}"), env = "TEMP_DIR")?;
 // → Ok with TEMP_DIR or default path, or Err(AppPathError)
 
 // Same syntax, graceful error handling
