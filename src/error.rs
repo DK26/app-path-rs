@@ -3,9 +3,8 @@ use std::path::PathBuf;
 
 /// Error type for AppPath operations.
 ///
-/// This enum represents the possible failures that can occur when determining
-/// the executable location. These errors are rare in practice and typically
-/// indicate fundamental system issues.
+/// This enum represents the possible failures that can occur when working with
+/// AppPath instances. These include both system-level failures and I/O errors.
 ///
 /// # When These Errors Occur
 ///
@@ -18,10 +17,14 @@ use std::path::PathBuf;
 ///   - Extremely rare, indicates a corrupted or broken system
 ///   - May occur with custom or non-standard program loaders
 ///
-/// These errors represent system-level failures that are typically unrecoverable
-/// for portable applications. Most applications should use the infallible API
-/// (`new()`, `exe_dir()`) and handle these rare cases through environment
-/// variables or fallback strategies.
+/// - **`IoError`**: When I/O operations fail
+///   - Directory creation fails due to insufficient permissions
+///   - Disk space issues or filesystem errors
+///   - Invalid path characters for the target filesystem
+///   - Network filesystem problems
+///
+/// System-level errors are typically unrecoverable for portable applications,
+/// while I/O errors may be recoverable depending on the specific cause.
 ///
 /// # Examples
 ///
@@ -41,6 +44,10 @@ use std::path::PathBuf;
 ///         eprintln!("Invalid executable path: {msg}");
 ///         // Fallback to alternative configuration
 ///     }
+///     Err(AppPathError::IoError(io_err)) => {
+///         eprintln!("I/O operation failed: {io_err}");
+///         // Handle specific I/O error
+///     }
 /// }
 /// ```
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -56,6 +63,15 @@ pub enum AppPathError {
     /// This error occurs when the system returns an empty executable path,
     /// which is extremely rare and indicates a corrupted or broken system.
     InvalidExecutablePath(String),
+
+    /// An I/O operation failed.
+    ///
+    /// This error occurs when filesystem operations fail, such as:
+    /// - Creating directories fails due to permissions
+    /// - Disk space is insufficient
+    /// - Path contains invalid characters for the filesystem
+    /// - Network filesystem issues
+    IoError(String),
 }
 
 impl std::fmt::Display for AppPathError {
@@ -67,11 +83,45 @@ impl std::fmt::Display for AppPathError {
             AppPathError::InvalidExecutablePath(msg) => {
                 write!(f, "Invalid executable path: {msg}")
             }
+            AppPathError::IoError(msg) => {
+                write!(f, "I/O operation failed: {msg}")
+            }
         }
     }
 }
 
 impl std::error::Error for AppPathError {}
+
+impl From<std::io::Error> for AppPathError {
+    fn from(err: std::io::Error) -> Self {
+        AppPathError::IoError(err.to_string())
+    }
+}
+
+/// Creates an IoError with path context for better debugging.
+///
+/// This implementation adds the file path to I/O error messages, making it easier
+/// to identify which path caused the failure in complex directory operations.
+///
+/// # Examples
+///
+/// ```rust
+/// use app_path::AppPathError;
+/// use std::path::PathBuf;
+///
+/// let io_error = std::io::Error::new(std::io::ErrorKind::PermissionDenied, "access denied");
+/// let path = PathBuf::from("/some/restricted/path");
+/// let app_error = AppPathError::from((io_error, &path));
+///
+/// // Error message includes both the original error and the path
+/// assert!(app_error.to_string().contains("access denied"));
+/// assert!(app_error.to_string().contains("/some/restricted/path"));
+/// ```
+impl From<(std::io::Error, &PathBuf)> for AppPathError {
+    fn from((err, path): (std::io::Error, &PathBuf)) -> Self {
+        AppPathError::IoError(format!("{err} (path: {})", path.display()))
+    }
+}
 
 /// Try to determine the executable directory (fallible version).
 ///
@@ -80,13 +130,17 @@ impl std::error::Error for AppPathError {}
 /// exposing them as errors to API users.
 pub(crate) fn try_exe_dir_init() -> Result<PathBuf, AppPathError> {
     let exe = current_exe().map_err(|e| {
-        AppPathError::ExecutableNotFound(format!("std::env::current_exe() failed: {e}"))
+        AppPathError::ExecutableNotFound(format!(
+            "std::env::current_exe() failed: {e} (environment: {})",
+            std::env::var("OS").unwrap_or_else(|_| "unknown OS".to_string())
+        ))
     })?;
 
     if exe.as_os_str().is_empty() {
-        return Err(AppPathError::InvalidExecutablePath(
-            "Executable path is empty - unsupported environment".to_string(),
-        ));
+        return Err(AppPathError::InvalidExecutablePath(format!(
+            "Executable path is empty - unsupported environment (process id: {})",
+            std::process::id()
+        )));
     }
 
     // Handle edge case: executable at filesystem root (jailed environments, etc.)

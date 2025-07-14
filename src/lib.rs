@@ -163,6 +163,64 @@
 //!
 //! **For libraries or applications requiring graceful error handling**, use the fallible
 //! variants [`AppPath::try_new()`] and [`try_exe_dir()`] instead.
+//!
+//! ## Ecosystem Integration
+//!
+//! `app-path` integrates seamlessly with popular Rust path crates through standard trait implementations:
+//!
+//! ### UTF-8 Path Serialization (camino)
+//!
+//! ```rust
+//! use app_path::app_path;
+//! # // Conditional compilation for documentation without dependencies
+//! # /*
+//! use camino::Utf8PathBuf;
+//!
+//! let static_dir = app_path!("web/static", env = "STATIC_DIR");
+//! let utf8_static = Utf8PathBuf::try_from(static_dir)?; // Direct conversion
+//!
+//! // Safe JSON serialization with UTF-8 guarantees
+//! let config = serde_json::json!({ "static_files": utf8_static });
+//! # */
+//! # Ok::<(), Box<dyn std::error::Error>>(())
+//! ```
+//!
+//! ### Cross-Platform Path Types (typed-path)
+//!
+//! ```rust
+//! use app_path::app_path;
+//! # // Conditional compilation for documentation without dependencies
+//! # /*
+//! use typed_path::{WindowsPath, UnixPath};
+//!
+//! let dist_dir = app_path!("dist");
+//!
+//! // Platform-specific paths with proper separators
+//! let win_path = WindowsPath::new(&dist_dir);  // Uses \ on Windows  
+//! let unix_path = UnixPath::new(&dist_dir);    // Uses / on Unix
+//! # */
+//! # Ok::<(), Box<dyn std::error::Error>>(())
+//! ```
+//!
+//! ### Secure Path Operations (pathos)
+//!
+//! ```rust
+//! use app_path::app_path;
+//! # // Conditional compilation for documentation without dependencies
+//! # /*
+//! use pathos::PathExt;
+//!
+//! let plugin_dir = app_path!("plugins");
+//! let plugin_path = plugin_dir.as_path().join("user_plugin.wasm");
+//!
+//! // Automatic normalization and traversal protection
+//! let safe_path = plugin_path.normalize()?;
+//! if !safe_path.starts_with(&plugin_dir) {
+//!     return Err("Path traversal detected".into());
+//! }
+//! # */
+//! # Ok::<(), Box<dyn std::error::Error>>(())
+//! ```
 
 mod app_path;
 mod error;
@@ -323,6 +381,9 @@ macro_rules! app_path {
 ///     }
 ///     Err(AppPathError::InvalidExecutablePath(msg)) => {
 ///         eprintln!("Invalid executable path: {msg}");
+///     }
+///     Err(AppPathError::IoError(msg)) => {
+///         eprintln!("I/O operation failed: {msg}");
 ///     }
 /// }
 /// ```
