@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.5] - 2025-07-14
+
+### Changed
+- **Directory creation error types** - `create_parents()` and `create_dir()` now return `AppPathError` instead of `std::io::Error`
+  - Provides consistent error handling across all AppPath APIs
+  - `std::io::Error` is automatically converted via `From<std::io::Error>` implementation
+  - Enables unified error handling patterns in applications
+
+### Enhanced
+- **Complete error documentation** - Added comprehensive `# Errors` sections to all fallible APIs
+  - `AppPath::try_new()`, `try_exe_dir()`, `try_with_override()` methods now document specific error conditions
+  - `create_parents()` and `create_dir()` methods document I/O failure scenarios
+  - All error documentation references specific `AppPathError` variants with detailed explanations
+- **Ecosystem integration guide** - Added real-world integration examples with popular Rust path crates
+  - Integration patterns for `camino` (UTF-8 paths), `typed-path` (cross-platform), `pathos` (security)
+  - Direct conversion examples showing seamless interoperability
+  - Migration-friendly guidance for adopting AppPath in existing codebases
+- **Documentation structure** - Optimized README.md flow following marketing best practices
+  - Moved Features section early for better user engagement
+  - Relocated Installation/Documentation to end following Hook→Interest→Desire→Action pattern
+
 ## [0.2.4] - 2025-07-13
 
 ### Added

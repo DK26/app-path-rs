@@ -59,6 +59,18 @@ impl AppPath {
     /// # std::fs::remove_dir_all(&temp_dir).ok();
     /// # Ok::<(), app_path::AppPathError>(())
     /// ```
+    ///
+    /// # Errors
+    ///
+    /// Returns [`AppPathError::IoError`] if directory creation fails:
+    /// - **Insufficient permissions** - Cannot create directories due to filesystem permissions
+    /// - **Disk space exhausted** - Not enough space to create directory entries
+    /// - **Invalid path characters** - Path contains characters invalid for the target filesystem
+    /// - **Network filesystem issues** - Problems with remote/networked filesystems
+    /// - **Filesystem corruption** - Underlying filesystem errors
+    ///
+    /// The operation is **not atomic** - some parent directories may be created even if the
+    /// operation ultimately fails.
     #[inline]
     pub fn create_parents(&self) -> Result<(), AppPathError> {
         if let Some(parent) = self.full_path.parent() {
@@ -184,6 +196,19 @@ impl AppPath {
     /// # std::fs::remove_dir_all(&temp_dir).ok();
     /// # Ok::<(), app_path::AppPathError>(())
     /// ```
+    ///
+    /// # Errors
+    ///
+    /// Returns [`AppPathError::IoError`] if directory creation fails:
+    /// - **Insufficient permissions** - Cannot create directories due to filesystem permissions
+    /// - **Disk space exhausted** - Not enough space to create directory entries  
+    /// - **Invalid path characters** - Path contains characters invalid for the target filesystem
+    /// - **Network filesystem issues** - Problems with remote/networked filesystems
+    /// - **Path already exists as file** - A file already exists at this path (not a directory)
+    /// - **Filesystem corruption** - Underlying filesystem errors
+    ///
+    /// The operation creates parent directories as needed, but is **not atomic** - some
+    /// parent directories may be created even if the final directory creation fails.
     #[inline]
     pub fn create_dir(&self) -> Result<(), AppPathError> {
         std::fs::create_dir_all(self.path())?;

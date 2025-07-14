@@ -35,6 +35,16 @@ database.create_parents()?; // Creates data/ directory if it doesn't exist
 | System directories | Scatters files across system       | ✅ Self-contained, portable      |
 | Hardcoded paths    | Breaks when moved                  | ✅ Works anywhere                |
 
+## Features
+
+- 🚀 **Zero dependencies** - Only standard library
+- ✨ **Ergonomic macro** - Clean syntax with `app_path!`
+- 🌍 **Cross-platform** - Windows, Linux, macOS  
+- ⚡ **High performance** - Static caching, minimal allocations
+- 🔧 **Flexible deployment** - Environment overrides
+- 🛡️ **Thread-safe** - Concurrent access safe
+- 📦 **Portable** - Entire app moves as one unit
+
 ## API Overview
 
 ### The `app_path!` Macro (Recommended)
@@ -110,7 +120,7 @@ let temp_with_env = try_app_path!(format!("temp-{version}"), env = "TEMP_DIR")?;
 
 // Same syntax, graceful error handling
 match try_app_path!("logs/app.log") {
-    Ok(log_path) => log_path.ensure_parent_dirs()?,
+    Ok(log_path) => log_path.create_parents()?,
     Err(e) => eprintln!("Failed to determine log path: {e}"),
 }
 // → Either creates logs/ directory or prints error message
@@ -227,15 +237,63 @@ match AppPath::try_new("config.toml") {
 }
 ```
 
-## Features
+## Ecosystem Integration
 
-- 🚀 **Zero dependencies** - Only standard library
-- ✨ **Ergonomic macro** - Clean syntax with `app_path!`
-- 🌍 **Cross-platform** - Windows, Linux, macOS  
-- ⚡ **High performance** - Static caching, minimal allocations
-- 🔧 **Flexible deployment** - Environment overrides
-- 🛡️ **Thread-safe** - Concurrent access safe
-- 📦 **Portable** - Entire app moves as one unit
+`app-path` integrates seamlessly with popular Rust path crates, letting you combine the best tools for your specific needs:
+
+### 🔗 **Popular Path Crate Compatibility**
+
+| Crate | Use Case | Integration Pattern |
+|-------|----------|-------------------|
+| **[`camino`](https://crates.io/crates/camino)** | UTF-8 path guarantees for web apps | `Utf8PathBuf::try_from(app_path)?` |
+| **[`typed-path`](https://crates.io/crates/typed-path)** | Cross-platform type-safe paths | `WindowsPath::new(&app_path)` |
+| **[`pathos`](https://crates.io/crates/pathos)** | Advanced path operations & security | `SecurePath::new(&app_path)?` |
+
+### 📝 **Real-World Integration Examples**
+
+#### 🌐 **JSON-Safe Web Config** (with `camino`)
+```rust
+use app_path::app_path;
+use camino::Utf8PathBuf;
+
+let static_dir = app_path!("web/static", env = "STATIC_DIR");
+let utf8_static = Utf8PathBuf::try_from(static_dir)?; // Direct conversion
+
+// Guaranteed UTF-8 for JSON serialization
+let config = serde_json::json!({ "static_files": utf8_static });
+```
+
+#### 🔨 **Cross-Platform Build System** (with `typed-path`)
+```rust
+use app_path::app_path;
+use typed_path::{WindowsPath, UnixPath};
+
+let dist_dir = app_path!("dist");
+
+// Platform-specific paths with proper separators
+let win_path = WindowsPath::new(&dist_dir);  // Uses \ on Windows
+let unix_path = UnixPath::new(&dist_dir);    // Uses / on Unix
+```
+
+#### 🛡️ **Secure Plugin System** (with `pathos`)
+```rust
+use app_path::app_path;
+use pathos::Path as SecurePath;
+
+let plugin_dir = app_path!("plugins");
+let plugin_path = SecurePath::new(&plugin_dir)?.join("user_plugin.wasm")?;
+
+// Automatic path normalization and traversal protection
+let safe_path = plugin_path.normalize()?;
+```
+
+### 🛠 **Migration-Friendly**
+
+Since `AppPath` implements `Deref<Target=Path>` and `AsRef<Path>`, you can:
+- **Drop-in replace** existing `PathBuf` usage
+- **Gradually adopt** without rewriting entire codebases  
+- **Mix and match** with specialized path libraries
+- **Zero runtime overhead** for standard path operations
 
 ## Installation
 
@@ -244,4 +302,6 @@ match AppPath::try_new("config.toml") {
 app-path = "0.2"
 ```
 
-For comprehensive API documentation, see [docs.rs/app-path](https://docs.rs/app-path).
+## Documentation
+
+For comprehensive API documentation, examples, and guides, see [docs.rs/app-path](https://docs.rs/app-path).

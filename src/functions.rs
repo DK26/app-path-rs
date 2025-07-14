@@ -91,6 +91,16 @@ pub fn exe_dir() -> &'static Path {
 /// * `Ok(&'static Path)` - The directory containing the current executable
 /// * `Err(AppPathError)` - Failed to determine executable location
 ///
+/// # Errors
+///
+/// Returns [`AppPathError`] if the executable location cannot be determined:
+/// - [`AppPathError::ExecutableNotFound`] - `std::env::current_exe()` fails (extremely rare)
+/// - [`AppPathError::InvalidExecutablePath`] - Executable path is empty (system corruption)
+///
+/// These errors represent unrecoverable system failures that occur at application startup.
+/// After the first successful call, the executable directory is cached and this function
+/// will never return an error.
+///
 /// # Performance
 ///
 /// This function is highly optimized:

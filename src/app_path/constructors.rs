@@ -246,6 +246,16 @@ impl AppPath {
     ///     Ok(())
     /// }
     /// ```
+    ///
+    /// # Errors
+    ///
+    /// Returns [`AppPathError`] if the executable location cannot be determined:
+    /// - [`AppPathError::ExecutableNotFound`] - `std::env::current_exe()` fails (extremely rare)
+    /// - [`AppPathError::InvalidExecutablePath`] - Executable path is empty (system corruption)
+    ///
+    /// These errors represent unrecoverable system failures that occur at application startup.
+    /// After the first successful call, the executable directory is cached and this method
+    /// will never return an error.
     #[inline]
     pub fn try_new(path: impl AsRef<Path>) -> Result<Self, AppPathError> {
         let exe_dir = try_exe_dir()?;
@@ -416,6 +426,15 @@ impl AppPath {
     ///     Ok((config, data))
     /// }
     /// ```
+    ///
+    /// # Errors
+    ///
+    /// Returns [`AppPathError`] if the executable location cannot be determined:
+    /// - [`AppPathError::ExecutableNotFound`] - `std::env::current_exe()` fails (extremely rare)
+    /// - [`AppPathError::InvalidExecutablePath`] - Executable path is empty (system corruption)
+    ///
+    /// See [`AppPath::try_new()`] for detailed error conditions. After the first successful call
+    /// to any AppPath method, this method will never return an error (uses cached result).
     #[inline]
     pub fn try_with_override(
         default: impl AsRef<Path>,
@@ -495,6 +514,15 @@ impl AppPath {
     ///     })
     /// }
     /// ```
+    ///
+    /// # Errors
+    ///
+    /// Returns [`AppPathError`] if the executable location cannot be determined:
+    /// - [`AppPathError::ExecutableNotFound`] - `std::env::current_exe()` fails (extremely rare)  
+    /// - [`AppPathError::InvalidExecutablePath`] - Executable path is empty (system corruption)
+    ///
+    /// See [`AppPath::try_new()`] for detailed error conditions. After the first successful call
+    /// to any AppPath method, this method will never return an error (uses cached result).
     #[inline]
     pub fn try_with_override_fn<F, P>(
         default: impl AsRef<Path>,
