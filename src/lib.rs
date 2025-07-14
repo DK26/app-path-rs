@@ -77,6 +77,39 @@
 //!
 //! ```
 //!
+//! ## XDG Base Directory Integration
+//!
+//! For Linux applications following XDG Base Directory standards:
+//!
+//! ```rust
+//! # use app_path::app_path;
+//! // XDG config directory with fallback
+//! let config_dir = app_path!("config", fn = || {
+//!     std::env::var("XDG_CONFIG_HOME")
+//!         .or_else(|_| std::env::var("HOME").map(|h| format!("{h}/.config/myapp")))
+//!         .ok()
+//! });
+//! // → /home/user/.config/myapp (Linux) or /path/to/exe/config (fallback)
+//!
+//! // XDG data directory
+//! let data_dir = app_path!("data", fn = || {
+//!     std::env::var("XDG_DATA_HOME")
+//!         .or_else(|_| std::env::var("HOME").map(|h| format!("{h}/.local/share/myapp")))
+//!         .ok()
+//! });
+//! // → /home/user/.local/share/myapp (Linux) or /path/to/exe/data (fallback)
+//!
+//! // XDG cache directory
+//! let cache_dir = app_path!("cache", fn = || {
+//!     std::env::var("XDG_CACHE_HOME")
+//!         .or_else(|_| std::env::var("HOME").map(|h| format!("{h}/.cache/myapp")))
+//!         .ok()
+//! });
+//! // → /home/user/.cache/myapp (Linux) or /path/to/exe/cache (fallback)
+//! # Ok::<(), Box<dyn std::error::Error>>(())
+//!
+//! ```
+//!
 //! ## Key Features
 //!
 //! - **Portable**: Relative paths resolve to executable directory  

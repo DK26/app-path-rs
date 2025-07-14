@@ -73,6 +73,26 @@ fn test_error_trait_source_for_io_error() {
     assert!(std::error::Error::source(&error).is_none());
 }
 
+#[test]
+fn test_error_from_io_error() {
+    let io_error = std::io::Error::new(std::io::ErrorKind::NotFound, "file not found");
+    let app_error = AppPathError::from(io_error);
+
+    assert!(matches!(app_error, AppPathError::IoError(_)));
+    assert!(app_error.to_string().contains("file not found"));
+}
+
+#[test]
+fn test_error_from_io_error_with_path() {
+    let io_error = std::io::Error::new(std::io::ErrorKind::PermissionDenied, "permission denied");
+    let path = PathBuf::from("/test/path");
+    let app_error = AppPathError::from((io_error, &path));
+
+    assert!(matches!(app_error, AppPathError::IoError(_)));
+    assert!(app_error.to_string().contains("permission denied"));
+    assert!(app_error.to_string().contains("/test/path"));
+}
+
 // === Integration Tests with Standard Library ===
 
 #[test]

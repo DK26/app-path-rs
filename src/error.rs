@@ -98,6 +98,31 @@ impl From<std::io::Error> for AppPathError {
     }
 }
 
+/// Creates an IoError with path context for better debugging.
+///
+/// This implementation adds the file path to I/O error messages, making it easier
+/// to identify which path caused the failure in complex directory operations.
+///
+/// # Examples
+///
+/// ```rust
+/// use app_path::AppPathError;
+/// use std::path::PathBuf;
+///
+/// let io_error = std::io::Error::new(std::io::ErrorKind::PermissionDenied, "access denied");
+/// let path = PathBuf::from("/some/restricted/path");
+/// let app_error = AppPathError::from((io_error, &path));
+///
+/// // Error message includes both the original error and the path
+/// assert!(app_error.to_string().contains("access denied"));
+/// assert!(app_error.to_string().contains("/some/restricted/path"));
+/// ```
+impl From<(std::io::Error, &PathBuf)> for AppPathError {
+    fn from((err, path): (std::io::Error, &PathBuf)) -> Self {
+        AppPathError::IoError(format!("{err} (path: {})", path.display()))
+    }
+}
+
 /// Try to determine the executable directory (fallible version).
 ///
 /// This is the internal fallible initialization function that both the fallible
@@ -105,13 +130,17 @@ impl From<std::io::Error> for AppPathError {
 /// exposing them as errors to API users.
 pub(crate) fn try_exe_dir_init() -> Result<PathBuf, AppPathError> {
     let exe = current_exe().map_err(|e| {
-        AppPathError::ExecutableNotFound(format!("std::env::current_exe() failed: {e}"))
+        AppPathError::ExecutableNotFound(format!(
+            "std::env::current_exe() failed: {e} (environment: {})",
+            std::env::var("OS").unwrap_or_else(|_| "unknown OS".to_string())
+        ))
     })?;
 
     if exe.as_os_str().is_empty() {
-        return Err(AppPathError::InvalidExecutablePath(
-            "Executable path is empty - unsupported environment".to_string(),
-        ));
+        return Err(AppPathError::InvalidExecutablePath(format!(
+            "Executable path is empty - unsupported environment (process id: {})",
+            std::process::id()
+        )));
     }
 
     // Handle edge case: executable at filesystem root (jailed environments, etc.)
