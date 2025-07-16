@@ -78,7 +78,7 @@ fn test_ord_sorting() {
 
     paths.sort();
 
-    assert!(paths[0].path().ends_with("a.toml"));
-    assert!(paths[1].path().ends_with("m.toml"));
-    assert!(paths[2].path().ends_with("z.toml"));
+    assert!(paths[0].ends_with("a.toml"));
+    assert!(paths[1].ends_with("m.toml"));
+    assert!(paths[2].ends_with("z.toml"));
 }

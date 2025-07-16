@@ -60,14 +60,14 @@ fn test_from_pathbuf() {
 
     // Note: From trait uses AppPath resolution, so path will be resolved relative to exe dir
     // Check that the resolved path ends with the original filename
-    assert!(app_path.path().ends_with("config.toml"));
+    assert!(app_path.ends_with("config.toml"));
 }
 
 #[test]
 fn test_from_str() {
     // AppPath doesn't implement FromStr trait, use new() instead
     let app_path = AppPath::new("config.toml");
-    assert!(app_path.path().ends_with("config.toml"));
+    assert!(app_path.ends_with("config.toml"));
 }
 
 // === Borrow Trait Tests ===
@@ -127,5 +127,5 @@ fn test_works_with_std_functions() {
 
     // Should work with path joining
     let joined = app_path.join("subfile.txt");
-    assert!(joined.path().to_string_lossy().contains("test_file.txt"));
+    assert!(joined.to_string_lossy().contains("test_file.txt"));
 }

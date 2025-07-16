@@ -184,7 +184,7 @@ fn test_ancestors() {
 
     // Should include the path itself and all parent directories
     assert!(ancestors.len() > 3);
-    assert_eq!(ancestors[0], nested_path.path());
+    assert_eq!(ancestors[0], &*nested_path);
     assert!(ancestors[1].ends_with("nested"));
     assert!(ancestors[2].ends_with("deep"));
     assert!(ancestors[3].ends_with("config"));
@@ -203,7 +203,7 @@ fn test_to_string_lossy() {
 fn test_to_path_buf() {
     let app_path = app_path!("config.toml");
     let path_buf: PathBuf = app_path.to_path_buf();
-    assert_eq!(app_path.path(), path_buf.as_path());
+    assert_eq!(&*app_path, path_buf.as_path());
 }
 
 #[test]
@@ -313,9 +313,114 @@ fn test_path_comparison() {
     let path2 = app_path!("config.toml");
     let path3 = app_path!("settings.toml");
 
-    assert_eq!(path1.path(), path2.path());
-    assert_ne!(path1.path(), path3.path());
+    assert_eq!(&*path1, &*path2);
+    assert_ne!(&*path1, &*path3);
 
     // Test lexicographic ordering
-    assert!(path1.path() < path3.path()); // "config" < "settings"
+    assert!(*path1 < *path3); // "config" < "settings"
+}
+
+// === into_inner() Method Tests ===
+
+#[test]
+fn test_into_inner_basic() {
+    let app_path = app_path!("config.toml");
+    let expected_path = app_path.to_path_buf();
+
+    let inner_path: PathBuf = app_path.into_inner();
+
+    assert_eq!(inner_path, expected_path);
+    assert!(inner_path.is_absolute());
+    assert!(inner_path.ends_with("config.toml"));
+}
+
+#[test]
+fn test_into_inner_with_nested_path() {
+    let app_path = app_path!("config/settings/app.toml");
+    let expected_path = app_path.to_path_buf();
+
+    let inner_path: PathBuf = app_path.into_inner();
+
+    assert_eq!(inner_path, expected_path);
+    assert!(inner_path.is_absolute());
+    assert!(inner_path.ends_with("config/settings/app.toml"));
+}
+
+#[test]
+fn test_into_inner_with_directory_path() {
+    let app_path = app_path!("data/cache/");
+    let expected_path = app_path.to_path_buf();
+
+    let inner_path: PathBuf = app_path.into_inner();
+
+    assert_eq!(inner_path, expected_path);
+    assert!(inner_path.is_absolute());
+    assert!(inner_path.ends_with("data/cache"));
+}
+
+#[test]
+fn test_into_inner_type_consistency() {
+    let app_path = app_path!("test.txt");
+
+    // Verify the returned type is exactly PathBuf
+    let inner: PathBuf = app_path.into_inner();
+
+    // Should be able to use all PathBuf methods
+    let _display = inner.display();
+    let _components: Vec<_> = inner.components().collect();
+    let _extension = inner.extension();
+    let _file_name = inner.file_name();
+
+    // Should be convertible to standard path types
+    let _path_ref: &Path = inner.as_path();
+    let _os_str = inner.as_os_str();
+}
+
+#[test]
+fn test_into_inner_ownership_transfer() {
+    let app_path = app_path!("owned.txt");
+    let original_path = app_path.to_path_buf();
+
+    // Move ownership with into_inner
+    let inner_path = app_path.into_inner();
+
+    // Verify the path is the same
+    assert_eq!(inner_path, original_path);
+
+    // app_path is now consumed and cannot be used
+    // This test verifies that we truly get ownership of the inner PathBuf
+    drop(inner_path); // Explicit drop to show ownership
+}
+
+#[test]
+fn test_into_inner_with_special_characters() {
+    let app_path = app_path!("files with spaces/üñíçøðé.txt");
+    let expected_path = app_path.to_path_buf();
+
+    let inner_path: PathBuf = app_path.into_inner();
+
+    assert_eq!(inner_path, expected_path);
+    assert!(inner_path.is_absolute());
+    assert!(inner_path.to_string_lossy().contains("üñíçøðé.txt"));
+}
+
+#[test]
+fn test_into_inner_with_override() {
+    // Test case 1: Override with a custom path (completely replaces default)
+    let custom_path = std::env::temp_dir().join("custom_config.toml");
+    let app_path = AppPath::with_override("config.toml", Some(&custom_path));
+    let inner_path: PathBuf = app_path.into_inner();
+
+    // When override is Some, it completely replaces the default path
+    assert_eq!(inner_path, custom_path);
+    assert!(inner_path.is_absolute());
+    assert!(inner_path.ends_with("custom_config.toml"));
+
+    // Test case 2: No override, should use default relative to exe_dir
+    let app_path_default = AppPath::with_override("config.toml", None::<&str>);
+    let inner_path_default: PathBuf = app_path_default.into_inner();
+    let expected_default = exe_dir().join("config.toml");
+
+    assert_eq!(inner_path_default, expected_default);
+    assert!(inner_path_default.ends_with("config.toml"));
 }

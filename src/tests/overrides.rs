@@ -11,7 +11,7 @@ fn test_env_override_with_string() {
     env::set_var("TEST_ENV_OVERRIDE", &custom_path);
 
     let config = app_path!("default.toml", env = "TEST_ENV_OVERRIDE");
-    assert_eq!(config.path(), custom_path);
+    assert_eq!(&*config, custom_path.as_path());
 
     env::remove_var("TEST_ENV_OVERRIDE");
 }
@@ -20,7 +20,7 @@ fn test_env_override_with_string() {
 fn test_env_override_with_nonexistent_var() {
     let config = app_path!("default.toml", env = "DEFINITELY_NONEXISTENT_VAR");
     let expected = exe_dir().join("default.toml");
-    assert_eq!(config.path(), expected);
+    assert_eq!(&*config, expected.as_path());
 }
 
 #[test]

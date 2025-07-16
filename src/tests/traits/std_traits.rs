@@ -8,8 +8,8 @@ fn test_clone_trait() {
     let original = AppPath::new("config.toml");
     let cloned = original.clone();
 
-    assert_eq!(original.path(), cloned.path());
-    assert!(cloned.path().ends_with("config.toml"));
+    assert_eq!(&*original, &*cloned);
+    assert!(cloned.ends_with("config.toml"));
 }
 
 #[test]

@@ -29,17 +29,18 @@ fn resolves_relative_path_to_exe_dir() {
 }
 
 #[test]
-fn resolves_relative_path_with_custom_base() {
+fn handles_absolute_path_input() {
     let temp_dir = env::temp_dir().join("app_path_test_base");
     let _ = fs::remove_dir_all(&temp_dir);
     fs::create_dir_all(&temp_dir).unwrap();
 
     let rel = "subdir/file.txt";
-    let rel_path = AppPath::new(temp_dir.join(rel));
+    let absolute_path = temp_dir.join(rel);
+    let app_path = AppPath::new(&absolute_path);
     let expected = temp_dir.join(rel);
 
-    assert_eq!(rel_path.path(), &expected);
-    assert!(rel_path.path().is_absolute());
+    assert_eq!(&*app_path, expected.as_path());
+    assert!(app_path.is_absolute());
 }
 
 #[test]
@@ -53,7 +54,7 @@ fn can_access_file_using_full_path() {
 
     let rel_path = AppPath::new(temp_dir.join(file_name));
     assert!(rel_path.exists());
-    assert_eq!(rel_path.path(), &file_path);
+    assert_eq!(&*rel_path, file_path.as_path());
 }
 
 #[test]
@@ -66,7 +67,7 @@ fn handles_dot_and_dotdot_components() {
     let rel_path = AppPath::new(temp_dir.join(rel));
     let expected = temp_dir.join(rel);
 
-    assert_eq!(rel_path.path(), &expected);
+    assert_eq!(&*rel_path, expected.as_path());
 }
 
 #[test]
@@ -79,7 +80,7 @@ fn as_ref_and_into_pathbuf_are_consistent() {
 }
 
 #[test]
-fn test_path_method() {
+fn test_deref_coercion_patterns() {
     let rel = "data/file.txt";
     let temp_dir = env::temp_dir().join("app_path_test_full");
     let rel_path = AppPath::new(temp_dir.join(rel));
@@ -119,8 +120,8 @@ fn test_absolute_path_behavior() {
     let app_path = AppPath::new(absolute_path);
 
     // PathBuf::join() with absolute paths replaces the base path entirely
-    assert_eq!(app_path.path(), Path::new(absolute_path));
-    assert!(app_path.path().is_absolute());
+    assert_eq!(&*app_path, Path::new(absolute_path));
+    assert!(app_path.is_absolute());
 }
 
 #[test]
@@ -131,5 +132,5 @@ fn test_exe_dir_function() {
     // Should be consistent with AppPath behavior
     let config = AppPath::new("test.txt");
     let expected = dir.join("test.txt");
-    assert_eq!(config.path(), &expected);
+    assert_eq!(&*config, expected.as_path());
 }
