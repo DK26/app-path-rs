@@ -16,24 +16,25 @@ use app_path::app_path;
 let config = app_path!("config.toml");        // → /path/to/exe/config.toml
 let database = app_path!("data/users.db");    // → /path/to/exe/data/users.db
 
-// Acts just like std::path::Path
-if config.exists() {
-    let content = std::fs::read_to_string(&config)?;  // &config auto-derefs to &Path
-}
-
-// Environment override magic for deployment ✨
+// Environment override for deployment
 let logs = app_path!("logs/app.log", env = "LOG_PATH");
 // → Uses LOG_PATH if set, otherwise /path/to/exe/logs/app.log
-database.create_parents()?; // Creates data/ directory if it doesn't exist
+
+// Acts like std::path::Path + creates directories
+if !config.exists() {
+    config.create_parents()?; // Creates parent directories
+    std::fs::write(&config, "default config")?;
+}
 ```
 
 ## Why Choose AppPath?
 
 | Approach           | Problem                            | AppPath Solution                |
 | ------------------ | ---------------------------------- | ------------------------------- |
+| Hardcoded paths    | Breaks when moved                  | ✅ Works anywhere                |
 | `current_dir()`    | Depends on where user runs program | ✅ Always relative to executable |
 | System directories | Scatters files across system       | ✅ Self-contained, portable      |
-| Hardcoded paths    | Breaks when moved                  | ✅ Works anywhere                |
+| `current_exe()`    | Manual path joining, no caching, verbose error handling | ✅ Clean API, automatic caching, ergonomic macros |
 
 ## Features
 
@@ -54,23 +55,18 @@ use app_path::app_path;
 
 // Simple paths
 let config = app_path!("config.toml");
-// → /path/to/exe/config.toml
 let database = app_path!("data/users.db");
-// → /path/to/exe/data/users.db
 
-// Environment variable overrides for deployment
+// Environment overrides
 let logs = app_path!("logs/app.log", env = "LOG_PATH");
-// → Uses LOG_PATH if set, otherwise /path/to/exe/logs/app.log
 let cache = app_path!("cache", env = "CACHE_DIR");
-// → Uses CACHE_DIR if set, otherwise /path/to/exe/cache
 
-// Custom override logic with block expression
+// Custom override logic
 let data_dir = app_path!("data", override = {
     std::env::var("DATA_DIR")
         .or_else(|_| std::env::var("XDG_DATA_HOME").map(|p| format!("{p}/myapp")))
         .ok()
 });
-// → Uses DATA_DIR, then XDG_DATA_HOME/myapp, finally /path/to/exe/data
 
 // Function-based override (great for XDG support)
 let config_dir = app_path!("config", fn = || {
@@ -78,52 +74,36 @@ let config_dir = app_path!("config", fn = || {
         .or_else(|_| std::env::var("HOME").map(|h| format!("{h}/.config/myapp")))
         .ok()
 });
-// → /home/user/.config/myapp (Linux) or /path/to/exe/config (fallback)
 
-// Simple override with optional value
-let config = app_path!("config.toml", override = std::env::var("CONFIG_PATH").ok());
-// → Uses CONFIG_PATH if set, otherwise /path/to/exe/config.toml
-
-// Variable capturing in complex expressions
+// Variable capturing
 let version = "1.0";
 let versioned_cache = app_path!(format!("cache-{version}"));
-// → /path/to/exe/cache-1.0
-let temp_with_env = app_path!(format!("temp-{version}"), env = "TEMP_DIR");
-// → Uses TEMP_DIR if set, otherwise /path/to/exe/temp-1.0
 
-// Directory creation with clear intent
+// Directory creation
 logs.create_parents()?;              // Creates logs/ for the file
-app_path!("temp").create_dir()?;  // Creates temp/ directory itself
+app_path!("temp").create_dir()?;     // Creates temp/ directory itself
 ```
 
 ### Fallible `try_app_path!` Macro (Libraries)
 
-For libraries or applications requiring explicit error handling:
+For libraries requiring explicit error handling:
 
 ```rust
 use app_path::{try_app_path, AppPathError};
 
 // Returns Result<AppPath, AppPathError> instead of panicking
 let config = try_app_path!("config.toml")?;
-// → Ok(/path/to/exe/config.toml) or Err(AppPathError)
-
 let database = try_app_path!("data/users.db", env = "DATABASE_PATH")?;
-// → Ok with DATABASE_PATH or default path, or Err(AppPathError)
 
 // Variable capturing with error handling
 let version = "1.0";
 let versioned_cache = try_app_path!(format!("cache-{version}"))?;
-// → Ok(/path/to/exe/cache-1.0) or Err(AppPathError)
 
-let temp_with_env = try_app_path!(format!("temp-{version}"), env = "TEMP_DIR")?;
-// → Ok with TEMP_DIR or default path, or Err(AppPathError)
-
-// Same syntax, graceful error handling
+// Graceful error handling
 match try_app_path!("logs/app.log") {
     Ok(log_path) => log_path.create_parents()?,
     Err(e) => eprintln!("Failed to determine log path: {e}"),
 }
-// → Either creates logs/ directory or prints error message
 ```
 
 ### Constructor API (Alternative)
@@ -132,14 +112,38 @@ match try_app_path!("logs/app.log") {
 use app_path::AppPath;
 
 let config = AppPath::new("config.toml");
-// → /path/to/exe/config.toml (panics on system failure)
-
 let database = AppPath::with_override("data/users.db", std::env::var("DB_PATH").ok());
-// → Uses DB_PATH if set, otherwise /path/to/exe/data/users.db
 
 // For libraries requiring fallible behavior
 let config = AppPath::try_new("config.toml")?;
-// → Ok(/path/to/exe/config.toml) or Err(AppPathError)
+```
+
+## Error Handling
+
+AppPath uses **fail-fast by default** for better developer experience:
+
+- **`app_path!` and `AppPath::new()`** - Panic on critical system errors (executable location undetermined)
+- **`try_app_path!` and `AppPath::try_new()`** - Return `Result` for explicit error handling
+
+This design makes sense because if the system can't determine your executable location, there's usually no point continuing - it indicates severe system corruption or unsupported platforms.
+
+**For most applications**: Use the panicking variants (`app_path!`) - they fail fast on unrecoverable errors.
+
+**For libraries**: Use the fallible variants (`try_app_path!`) to let callers handle errors gracefully.
+
+```rust
+use app_path::{AppPath, AppPathError};
+
+// Libraries should handle errors explicitly
+match AppPath::try_new("config.toml") {
+    Ok(path) => println!("Config: {}", path.display()),
+    Err(AppPathError::ExecutableNotFound(msg)) => {
+        eprintln!("Cannot find executable: {msg}");
+    }
+    Err(AppPathError::InvalidExecutablePath(msg)) => {
+        eprintln!("Invalid executable path: {msg}");
+    }
+}
 ```
 
 ## Real-World Examples
@@ -195,18 +199,12 @@ let logs = if cfg!(debug_assertions) {
 
 ## Directory Creation
 
-AppPath provides intuitive methods with clear intent:
-
-- **`create_parents()`** - Creates parent directories for file paths
-- **`create_dir()`** - Creates the path as a directory
-
 ```rust
 use app_path::app_path;
 
 // Preparing to write files
 let log_file = app_path!("logs/app.log");
 log_file.create_parents()?; // Creates logs/ directory
-std::fs::write(&log_file, "Starting app...")?;
 
 // Creating directories
 let cache_dir = app_path!("cache");
@@ -218,24 +216,6 @@ cache_dir.create_dir()?; // Creates cache/ directory
 - **Relative paths** → executable directory: `"config.toml"` → `./config.toml`
 - **Absolute paths** → used as-is: `"/etc/app.conf"` → `/etc/app.conf`
 - **Environment overrides** → replace default when set
-
-## Error Handling
-
-AppPath panics only on extremely rare system failures (executable location undetermined). For libraries requiring explicit error handling:
-
-```rust
-use app_path::{AppPath, AppPathError};
-
-match AppPath::try_new("config.toml") {
-    Ok(path) => println!("Config: {}", path.display()),
-    Err(AppPathError::ExecutableNotFound(msg)) => {
-        eprintln!("Cannot find executable: {msg}");
-    }
-    Err(AppPathError::InvalidExecutablePath(msg)) => {
-        eprintln!("Invalid executable path: {msg}");
-    }
-}
-```
 
 ## Ecosystem Integration
 
@@ -256,9 +236,7 @@ use app_path::app_path;
 use camino::Utf8PathBuf;
 
 let static_dir = app_path!("web/static", env = "STATIC_DIR");
-let utf8_static = Utf8PathBuf::try_from(static_dir)?; // Direct conversion
-
-// Guaranteed UTF-8 for JSON serialization
+let utf8_static = Utf8PathBuf::try_from(static_dir)?;
 let config = serde_json::json!({ "static_files": utf8_static });
 ```
 
@@ -268,8 +246,6 @@ use app_path::app_path;
 use typed_path::{WindowsPath, UnixPath};
 
 let dist_dir = app_path!("dist");
-
-// Platform-specific paths with proper separators
 let win_path = WindowsPath::new(&dist_dir);  // Uses \ on Windows
 let unix_path = UnixPath::new(&dist_dir);    // Uses / on Unix
 ```
