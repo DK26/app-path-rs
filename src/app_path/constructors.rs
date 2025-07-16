@@ -355,11 +355,10 @@ impl AppPath {
     /// });
     /// ```
     #[inline]
-    pub fn with_override_fn<F, P>(default: impl AsRef<Path>, override_fn: F) -> Self
-    where
-        F: FnOnce() -> Option<P>,
-        P: AsRef<Path>,
-    {
+    pub fn with_override_fn<P: AsRef<Path>>(
+        default: impl AsRef<Path>,
+        override_fn: impl FnOnce() -> Option<P>,
+    ) -> Self {
         match override_fn() {
             Some(override_path) => Self::new(override_path),
             None => Self::new(default),
@@ -524,14 +523,10 @@ impl AppPath {
     /// See [`AppPath::try_new()`] for detailed error conditions. After the first successful call
     /// to any AppPath method, this method will never return an error (uses cached result).
     #[inline]
-    pub fn try_with_override_fn<F, P>(
+    pub fn try_with_override_fn<P: AsRef<Path>>(
         default: impl AsRef<Path>,
-        override_fn: F,
-    ) -> Result<Self, AppPathError>
-    where
-        F: FnOnce() -> Option<P>,
-        P: AsRef<Path>,
-    {
+        override_fn: impl FnOnce() -> Option<P>,
+    ) -> Result<Self, AppPathError> {
         match override_fn() {
             Some(override_path) => Self::try_new(override_path),
             None => Self::try_new(default),

@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.6] - 2025-07-16
+
+### Fixed
+- **Documentation accuracy** - Removed false third-party crate integration examples
+  - Removed incorrect `pathos` crate integration from README.md and src/lib.rs documentation
+  - Maintains only legitimate integrations: `camino` (UTF-8 paths) and `typed-path` (cross-platform)
+
+### Improved
+- **Code quality** - Cleaned up unused generic parameters in override methods
+  - Removed unused generic parameter `F` from `with_override_fn` and `try_with_override_fn` methods
+  - Simplified method signatures using modern Rust idioms (`impl Trait` where possible)
+  - Improved code readability and consistency across constructor methods
+
+### Enhanced
+- **Documentation structure and clarity** - Major README.md improvements for better user experience
+  - Reorganized sections for optimal flow: Hook → Benefits → Features → API → Error handling → Examples → Advanced
+  - Improved "Why Choose AppPath?" comparison table with logical progression from basic to advanced approaches
+  - Made all examples more concise and removed redundant verbose comments
+  - Clarified error handling section to explain when panics vs Results are used and why
+  - Positioned fail-fast behavior as an intentional design feature for better developer experience
+  - Enhanced API examples to be focused and non-repetitive while covering all key use cases
+
 ## [0.2.5] - 2025-07-14
 
 ### Changed
@@ -21,7 +43,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `create_parents()` and `create_dir()` methods document I/O failure scenarios
   - All error documentation references specific `AppPathError` variants with detailed explanations
 - **Ecosystem integration guide** - Added real-world integration examples with popular Rust path crates
-  - Integration patterns for `camino` (UTF-8 paths), `typed-path` (cross-platform), `pathos` (security)
+  - Integration patterns for `camino` (UTF-8 paths), `typed-path` (cross-platform)
   - Direct conversion examples showing seamless interoperability
   - Migration-friendly guidance for adopting AppPath in existing codebases
 - **Documentation structure** - Optimized README.md flow following marketing best practices
