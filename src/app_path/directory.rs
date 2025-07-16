@@ -211,7 +211,7 @@ impl AppPath {
     /// parent directories may be created even if the final directory creation fails.
     #[inline]
     pub fn create_dir(&self) -> Result<(), AppPathError> {
-        std::fs::create_dir_all(self.path())?;
+        std::fs::create_dir_all(self)?;
         Ok(())
     }
 }

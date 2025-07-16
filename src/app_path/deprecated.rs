@@ -22,7 +22,7 @@ impl AppPath {
     /// config_file.ensure_parent_dirs()?; // Creates config/ directory
     ///
     /// // Now you can write the file
-    /// std::fs::write(config_file.path(), "key = value")?;
+    /// std::fs::write(&config_file, "key = value")?;
     /// assert!(config_file.exists());
     ///
     /// // Prepare directories for a log file
@@ -39,7 +39,7 @@ impl AppPath {
     #[inline]
     pub fn ensure_parent_dirs(&self) -> std::io::Result<()> {
         if let Some(parent) = self.parent() {
-            std::fs::create_dir_all(parent.path())
+            std::fs::create_dir_all(&parent)
         } else {
             Ok(())
         }
@@ -168,7 +168,7 @@ impl AppPath {
     )]
     #[inline]
     pub fn ensure_dir_exists(&self) -> std::io::Result<()> {
-        std::fs::create_dir_all(self.path())
+        std::fs::create_dir_all(self)
     }
 
     /// Creates all directories needed for this path.

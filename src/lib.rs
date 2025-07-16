@@ -5,76 +5,25 @@
 //! ## Quick Start
 //!
 //! ```rust
-//! use app_path::{AppPath, app_path, try_app_path};
+//! use app_path::app_path;
 //!
-//! // Simple macro usage - files relative to your executable
+//! // Files relative to your executable - not current directory!
 //! let config = app_path!("config.toml");        // → /path/to/exe/config.toml
 //! let database = app_path!("data/users.db");    // → /path/to/exe/data/users.db
-//! let logs = app_path!("logs/app.log");         // → /path/to/exe/logs/app.log
 //!
-//! // Environment variable overrides for deployment
-//! let config_deploy = app_path!("config.toml", env = "CONFIG_PATH");
-//! // → Uses CONFIG_PATH if set, otherwise /path/to/exe/config.toml
+//! // Environment overrides for deployment
+//! let logs = app_path!("logs/app.log", env = "LOG_PATH");
+//! // → Uses LOG_PATH if set, otherwise /path/to/exe/logs/app.log
 //!
-//! let db_deploy = app_path!("data/users.db", override = std::env::var("DATABASE_PATH").ok());
-//! // → Uses DATABASE_PATH if set, otherwise /path/to/exe/data/users.db
-//!
-//! // Advanced override patterns for XDG/system integration
-//! let config_xdg = app_path!("config", fn = || {
-//!     std::env::var("XDG_CONFIG_HOME")
-//!         .or_else(|_| std::env::var("HOME").map(|h| format!("{h}/.config/myapp")))
-//!         .ok()
-//! });
-//! // → /home/user/.config/myapp (Linux) or /path/to/exe/config (fallback)
-//!
-//! // Complex override logic with block expressions
-//! let data_dir = app_path!("data", override = {
-//!     std::env::var("DATA_DIR")
-//!         .or_else(|_| std::env::var("XDG_DATA_HOME").map(|p| format!("{p}/myapp")))
-//!         .ok()
-//! });
-//! // → Uses DATA_DIR, then XDG_DATA_HOME/myapp, finally /path/to/exe/data
-//!
-//! // Variable capturing in complex expressions
-//! let version = "1.0";
-//! let versioned_cache = app_path!(format!("cache-{version}"));
-//! // → /path/to/exe/cache-1.0
-//!
-//! let temp_with_env = app_path!(format!("temp-{version}"), env = "TEMP_DIR");
-//! // → Uses TEMP_DIR if set, otherwise /path/to/exe/temp-1.0
-//!
-//! // Fallible variants for libraries (return Result instead of panicking)
-//! let config_safe = try_app_path!("config.toml")?;
-//! // → Ok(/path/to/exe/config.toml) or Err(AppPathError)
-//!
-//! let db_safe = try_app_path!("data/users.db", env = "DATABASE_PATH")?;
-//! // → Ok with DATABASE_PATH or default path, or Err(AppPathError)
-//!
-//! let cache_safe = try_app_path!(format!("cache-{version}"))?;
-//! // → Ok(/path/to/exe/cache-1.0) or Err(AppPathError)
-//!
-//! // Constructor API (alternative to macros)
-//! let traditional = AppPath::new("config.toml");
-//! // → /path/to/exe/config.toml (panics on system failure)
-//!
-//! let with_override = AppPath::with_override("config.toml", std::env::var("CONFIG_PATH").ok());
-//! // → Uses CONFIG_PATH if set, otherwise /path/to/exe/config.toml
-//!
-//! let fallible = AppPath::try_new("config.toml")?; // For libraries
-//! // → Ok(/path/to/exe/config.toml) or Err(AppPathError)
-//!
-//! // Works like standard paths - auto-derefs to &Path
+//! // Works like standard paths - all Path methods available
 //! if config.exists() {
 //!     let content = std::fs::read_to_string(&config)?;
-//!     // → Reads file content if config.toml exists
 //! }
 //!
-//! // Directory creation with clear intent
+//! // Directory creation
 //! logs.create_parents()?;                 // Creates logs/ directory for the file
 //! app_path!("cache").create_dir()?;       // Creates cache/ directory itself
-//! // → Both create directories if they don't exist
 //! # Ok::<(), Box<dyn std::error::Error>>(())
-//!
 //! ```
 //!
 //! ## Key Features
@@ -84,6 +33,7 @@
 //! - **Zero dependencies**: Only standard library
 //! - **High performance**: Static caching, minimal allocations
 //! - **Thread-safe**: Concurrent access safe
+//! - **Zero-cost**: All `Path` methods available via `Deref` (e.g., `exists()`, `is_file()`, `extension()`)
 //!
 //! ## API Design
 //!
@@ -205,7 +155,6 @@
 mod app_path;
 mod error;
 mod functions;
-mod traits;
 
 #[cfg(test)]
 mod tests;

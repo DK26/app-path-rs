@@ -24,8 +24,8 @@ fn resolves_relative_path_to_exe_dir() {
     let rel_path = AppPath::new(rel);
     let expected = exe_dir().join(rel);
 
-    assert_eq!(rel_path.path(), &expected);
-    assert!(rel_path.path().is_absolute());
+    assert_eq!(&*rel_path, &expected);
+    assert!(rel_path.is_absolute());
 }
 
 #[test]
@@ -83,7 +83,12 @@ fn test_path_method() {
     let rel = "data/file.txt";
     let temp_dir = env::temp_dir().join("app_path_test_full");
     let rel_path = AppPath::new(temp_dir.join(rel));
-    assert_eq!(rel_path.path(), temp_dir.join(rel));
+    let expected_path = temp_dir.join(rel);
+
+    // Demonstrating the improved patterns - use as_ref() or deref coercion
+    let as_ref_path: &Path = rel_path.as_ref();
+    assert_eq!(as_ref_path, expected_path.as_path());
+    assert_eq!(&*rel_path, expected_path.as_path());
 }
 
 #[test]
