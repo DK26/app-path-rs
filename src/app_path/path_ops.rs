@@ -26,26 +26,6 @@ impl AppPath {
         &self.full_path
     }
 
-    /// Check if the path exists.
-    ///
-    /// # Examples
-    ///
-    /// ```rust
-    /// use app_path::AppPath;
-    ///
-    /// let config = AppPath::new("config.toml");
-    ///
-    /// if config.exists() {
-    ///     println!("Config file found!");
-    /// } else {
-    ///     println!("Config file not found, using defaults.");
-    /// }
-    /// ```
-    #[inline]
-    pub fn exists(&self) -> bool {
-        self.full_path.exists()
-    }
-
     /// Joins additional path segments to create a new AppPath.
     ///
     /// This creates a new `AppPath` by joining the current path with additional segments.
@@ -112,92 +92,26 @@ impl AppPath {
         Self::new(self.full_path.with_extension(ext))
     }
 
-    /// Returns the file name of this path as an `OsStr`, if it exists.
+    /// Consumes the `AppPath` and returns the inner `PathBuf`.
     ///
-    /// This is a convenience method that delegates to the underlying `Path`.
-    ///
-    /// # Examples
-    ///
-    /// ```rust
-    /// use app_path::AppPath;
-    ///
-    /// let config = AppPath::new("config/app.toml");
-    /// assert_eq!(config.file_name().unwrap(), "app.toml");
-    /// ```
-    #[inline]
-    pub fn file_name(&self) -> Option<&std::ffi::OsStr> {
-        self.full_path.file_name()
-    }
-
-    /// Returns the file stem of this path as an `OsStr`, if it exists.
-    ///
-    /// This is a convenience method that delegates to the underlying `Path`.
+    /// This provides zero-cost extraction of the underlying `PathBuf` by moving
+    /// it out of the wrapper. This is useful when you need owned access to the
+    /// path for operations that consume `PathBuf`.
     ///
     /// # Examples
     ///
     /// ```rust
     /// use app_path::AppPath;
+    /// use std::path::PathBuf;
     ///
-    /// let config = AppPath::new("config/app.toml");
-    /// assert_eq!(config.file_stem().unwrap(), "app");
+    /// let app_path = AppPath::new("config.toml");
+    /// let path_buf: PathBuf = app_path.into_inner();
+    ///
+    /// // Now you have a regular PathBuf for operations that need ownership
+    /// assert!(path_buf.is_absolute());
     /// ```
     #[inline]
-    pub fn file_stem(&self) -> Option<&std::ffi::OsStr> {
-        self.full_path.file_stem()
-    }
-
-    /// Returns the extension of this path as an `OsStr`, if it exists.
-    ///
-    /// This is a convenience method that delegates to the underlying `Path`.
-    ///
-    /// # Examples
-    ///
-    /// ```rust
-    /// use app_path::AppPath;
-    ///
-    /// let config = AppPath::new("config/app.toml");
-    /// assert_eq!(config.extension().unwrap(), "toml");
-    /// ```
-    #[inline]
-    pub fn extension(&self) -> Option<&std::ffi::OsStr> {
-        self.full_path.extension()
-    }
-
-    /// Returns `true` if this path points to a directory.
-    ///
-    /// This is a convenience method that delegates to the underlying `Path`.
-    ///
-    /// # Examples
-    ///
-    /// ```rust
-    /// use app_path::AppPath;
-    ///
-    /// let data_dir = AppPath::new("data");
-    /// if data_dir.is_dir() {
-    ///     println!("Data directory exists");
-    /// }
-    /// ```
-    #[inline]
-    pub fn is_dir(&self) -> bool {
-        self.full_path.is_dir()
-    }
-
-    /// Returns `true` if this path points to a regular file.
-    ///
-    /// This is a convenience method that delegates to the underlying `Path`.
-    ///
-    /// # Examples
-    ///
-    /// ```rust
-    /// use app_path::AppPath;
-    ///
-    /// let config = AppPath::new("config.toml");
-    /// if config.is_file() {
-    ///     println!("Config file exists");
-    /// }
-    /// ```
-    #[inline]
-    pub fn is_file(&self) -> bool {
-        self.full_path.is_file()
+    pub fn into_inner(self) -> std::path::PathBuf {
+        self.full_path
     }
 }

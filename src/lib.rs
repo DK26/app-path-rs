@@ -84,6 +84,7 @@
 //! - **Zero dependencies**: Only standard library
 //! - **High performance**: Static caching, minimal allocations
 //! - **Thread-safe**: Concurrent access safe
+//! - **Zero-cost**: All `Path` methods available via `Deref` (e.g., `exists()`, `is_file()`, `extension()`)
 //!
 //! ## API Design
 //!
@@ -205,7 +206,6 @@
 mod app_path;
 mod error;
 mod functions;
-mod traits;
 
 #[cfg(test)]
 mod tests;

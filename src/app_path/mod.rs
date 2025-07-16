@@ -22,6 +22,7 @@ use std::path::PathBuf;
 /// - [`Self::try_new()`] - **Libraries**: Fallible version for error handling  
 /// - [`Self::with_override()`] - **Deployment**: Environment-configurable paths
 /// - [`Self::path()`] - **Access**: Get the resolved `&Path`
+/// - **All `Path` methods**: Available directly via `Deref<Target=Path>` (e.g., `exists()`, `is_file()`, `file_name()`, `extension()`)
 ///
 /// # Panics
 ///
@@ -62,3 +63,4 @@ mod constructors;
 mod deprecated;
 mod directory;
 mod path_ops;
+mod traits;

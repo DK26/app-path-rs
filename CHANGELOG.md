@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- **Performance optimization** - Improved trait implementations for better performance
+  - Moved `traits.rs` module from `src/` to `src/app_path/` for better code organization
+  - Optimized all trait implementations to use direct field access instead of method calls
+  - Removed 6 redundant methods (`exists`, `file_name`, `file_stem`, `extension`, `is_dir`, `is_file`) - all functionality remains available via `Deref<Target=Path>`
+  - Added `into_inner()` method for zero-cost extraction of internal `PathBuf`
+  - Optimized `From<AppPath>` trait implementations to move instead of clone
+
+### Improved
+- **Code organization** - All AppPath-related code now properly organized under `app_path/` module
+- **API surface** - Cleaner API with elimination of redundant methods while preserving all functionality
+
 ## [0.2.6] - 2025-07-16
 
 ### Fixed
