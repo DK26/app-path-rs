@@ -93,12 +93,12 @@
 //! let cache = app_path!(format!("cache-{version}")); // Captures `version`
 //! // → /path/to/exe/cache-1.0
 //!
-//! // Useful in closures and async blocks
-//! async fn process_data(id: u32) {
-//!     let output = app_path!(format!("output-{id}.json")); // Captures `id`
-//!     // → /path/to/exe/output-123.json (where id = 123)
-//!     // ... async processing
-//! }
+//! // Useful in closures and iterative processing
+//! let user_ids = vec![123, 456, 789];
+//! let log_files: Vec<_> = user_ids.iter()
+//!     .map(|id| app_path!(format!("logs/user-{id}.log"))) // Captures `id`
+//!     .collect();
+//! // → [/path/to/exe/logs/user-123.log, /path/to/exe/logs/user-456.log, ...]
 //! ```
 //!
 //! ### Panic Conditions

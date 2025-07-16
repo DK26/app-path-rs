@@ -109,7 +109,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Environment override: `app_path!("com.example.app", env_var)` and `try_app_path!("com.example.app", env_var)`
   - Optional override: `app_path!("com.example.app", option_value)` and `try_app_path!("com.example.app", option_value)`
   - Function-based override: `app_path_fn!(|| "dynamic")` and `try_app_path_fn!(|| "dynamic")`
-  - Essential for closures, async blocks, and complex control flow scenarios
+  - Essential for closures, iterative processing, and complex control flow scenarios
   - Maintains API symmetry and completeness between panicking and fallible variants
 
 ### Enhanced
