@@ -215,13 +215,17 @@ impl Deref for AppPath {
     /// // Direct access to Path methods through deref
     /// assert_eq!(app_path.extension(), Some("toml".as_ref()));
     /// assert_eq!(app_path.file_name(), Some("config.toml".as_ref()));
+    /// assert!(app_path.is_absolute());
     ///
     /// // Works with functions expecting &Path
     /// fn process_path(path: &std::path::Path) {
     ///     println!("Processing: {}", path.display());
     /// }
-    ///
     /// process_path(&app_path); // Automatic deref coercion
+    ///
+    /// // For explicit &Path reference when needed
+    /// let path_ref: &std::path::Path = &app_path;        // Via deref
+    /// let path_ref2: &std::path::Path = app_path.as_ref(); // Via AsRef
     /// ```
     #[inline]
     fn deref(&self) -> &Self::Target {

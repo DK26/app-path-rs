@@ -21,7 +21,7 @@ use std::path::PathBuf;
 /// - [`Self::new()`] - **Primary API**: Simple, infallible construction
 /// - [`Self::try_new()`] - **Libraries**: Fallible version for error handling  
 /// - [`Self::with_override()`] - **Deployment**: Environment-configurable paths
-/// - [`Self::path()`] - **Access**: Get the resolved `&Path`
+/// - [`Self::path()`] - **Access**: Get the resolved `&Path` (deprecated - use `&app_path` or `as_ref()`)
 /// - **All `Path` methods**: Available directly via `Deref<Target=Path>` (e.g., `exists()`, `is_file()`, `file_name()`, `extension()`)
 ///
 /// # Panics
@@ -38,9 +38,9 @@ use std::path::PathBuf;
 /// let config = AppPath::new("config.toml");
 /// let data = AppPath::new("data/users.db");
 ///
-/// // Works like standard paths
+/// // Works like standard paths - all Path methods available
 /// if config.exists() {
-///     let content = std::fs::read_to_string(&config);
+///     let content = std::fs::read_to_string(&config); // &config works directly
 /// }
 /// data.create_parents(); // Creates data/ directory for the file
 ///

@@ -15,12 +15,20 @@ impl AppPath {
     ///
     /// let config = AppPath::new("config.toml");
     ///
-    /// // Get the path for use with standard library functions
-    /// println!("Config path: {}", config.path().display());
+    /// // For displaying paths - use Display trait
+    /// println!("Config path: {}", config.display());
     ///
-    /// // The path is always absolute
-    /// assert!(config.path().is_absolute());
+    /// // For getting &Path reference - use deref
+    /// assert!(config.is_absolute());
+    ///
+    /// // For functions expecting &Path - use as_ref() or &config
+    /// std::fs::write(&config, "content")?;
+    /// # Ok::<(), std::io::Error>(())
     /// ```
+    #[deprecated(
+        since = "0.2.7",
+        note = "Use `&app_path` or `app_path.as_ref()` instead. AppPath implements Deref<Target=Path>, so all Path methods are directly available."
+    )]
     #[inline]
     pub fn path(&self) -> &Path {
         &self.full_path

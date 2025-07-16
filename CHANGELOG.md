@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.7] - 2025-07-16
+
+### Deprecated
+- **`.path()` method** - Use `&app_path` or `app_path.as_ref()` instead
+  - `AppPath` implements `Deref<Target=Path>`, so all `Path` methods are directly available
+  - This method is redundant since you can use `&app_path` anywhere a `&Path` is expected
+  - Deprecated since version 0.2.7
+
 ### Changed
 - **Performance optimization** - Improved trait implementations for better performance
   - Moved `traits.rs` module from `src/` to `src/app_path/` for better code organization
@@ -18,6 +26,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Improved
 - **Code organization** - All AppPath-related code now properly organized under `app_path/` module
 - **API surface** - Cleaner API with elimination of redundant methods while preserving all functionality
+- **Documentation clarity** - Significantly simplified Quick Start section in lib.rs
+  - Reduced verbose examples from 70+ lines to focused 15-line example
+  - Removed redundant advanced examples that overwhelmed new users
+  - Focused on 80% use case: basic paths, environment overrides, and directory creation
+  - Moved complex examples to detailed API documentation where they belong
 
 ## [0.2.6] - 2025-07-16
 
