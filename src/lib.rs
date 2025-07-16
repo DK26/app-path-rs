@@ -201,26 +201,6 @@
 //! # */
 //! # Ok::<(), Box<dyn std::error::Error>>(())
 //! ```
-//!
-//! ### Secure Path Operations (pathos)
-//!
-//! ```rust
-//! use app_path::app_path;
-//! # // Conditional compilation for documentation without dependencies
-//! # /*
-//! use pathos::PathExt;
-//!
-//! let plugin_dir = app_path!("plugins");
-//! let plugin_path = plugin_dir.as_path().join("user_plugin.wasm");
-//!
-//! // Automatic normalization and traversal protection
-//! let safe_path = plugin_path.normalize()?;
-//! if !safe_path.starts_with(&plugin_dir) {
-//!     return Err("Path traversal detected".into());
-//! }
-//! # */
-//! # Ok::<(), Box<dyn std::error::Error>>(())
-//! ```
 
 mod app_path;
 mod error;

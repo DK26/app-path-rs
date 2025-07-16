@@ -21,7 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `create_parents()` and `create_dir()` methods document I/O failure scenarios
   - All error documentation references specific `AppPathError` variants with detailed explanations
 - **Ecosystem integration guide** - Added real-world integration examples with popular Rust path crates
-  - Integration patterns for `camino` (UTF-8 paths), `typed-path` (cross-platform), `pathos` (security)
+  - Integration patterns for `camino` (UTF-8 paths), `typed-path` (cross-platform)
   - Direct conversion examples showing seamless interoperability
   - Migration-friendly guidance for adopting AppPath in existing codebases
 - **Documentation structure** - Optimized README.md flow following marketing best practices

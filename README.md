@@ -243,11 +243,10 @@ match AppPath::try_new("config.toml") {
 
 ### 🔗 **Popular Path Crate Compatibility**
 
-| Crate | Use Case | Integration Pattern |
-|-------|----------|-------------------|
-| **[`camino`](https://crates.io/crates/camino)** | UTF-8 path guarantees for web apps | `Utf8PathBuf::try_from(app_path)?` |
-| **[`typed-path`](https://crates.io/crates/typed-path)** | Cross-platform type-safe paths | `WindowsPath::new(&app_path)` |
-| **[`pathos`](https://crates.io/crates/pathos)** | Advanced path operations & security | `SecurePath::new(&app_path)?` |
+| Crate                                                   | Use Case                           | Integration Pattern                |
+| ------------------------------------------------------- | ---------------------------------- | ---------------------------------- |
+| **[`camino`](https://crates.io/crates/camino)**         | UTF-8 path guarantees for web apps | `Utf8PathBuf::try_from(app_path)?` |
+| **[`typed-path`](https://crates.io/crates/typed-path)** | Cross-platform type-safe paths     | `WindowsPath::new(&app_path)`      |
 
 ### 📝 **Real-World Integration Examples**
 
@@ -273,18 +272,6 @@ let dist_dir = app_path!("dist");
 // Platform-specific paths with proper separators
 let win_path = WindowsPath::new(&dist_dir);  // Uses \ on Windows
 let unix_path = UnixPath::new(&dist_dir);    // Uses / on Unix
-```
-
-#### 🛡️ **Secure Plugin System** (with `pathos`)
-```rust
-use app_path::app_path;
-use pathos::Path as SecurePath;
-
-let plugin_dir = app_path!("plugins");
-let plugin_path = SecurePath::new(&plugin_dir)?.join("user_plugin.wasm")?;
-
-// Automatic path normalization and traversal protection
-let safe_path = plugin_path.normalize()?;
 ```
 
 ### 🛠 **Migration-Friendly**
