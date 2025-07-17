@@ -148,8 +148,8 @@ impl AppPath {
     /// Returns the path as encoded bytes for low-level path operations.
     ///
     /// This provides access to the platform-specific byte representation of the path.
-    /// The returned bytes use an unspecified, platform-specific encoding and are only
-    /// valid within the same Rust version and target platform.
+    /// The returned bytes use platform-specific encoding and are only valid within
+    /// the same Rust version and target platform.
     ///
     /// **Safety Note**: These bytes should not be sent over networks, stored in files,
     /// or used across different platforms, as the encoding is implementation-specific.
@@ -171,8 +171,24 @@ impl AppPath {
     /// assert!(!bytes.is_empty());
     /// ```
     #[inline]
-    pub fn to_bytes(&self) -> &[u8] {
-        self.as_os_str().as_encoded_bytes()
+    pub fn to_bytes(&self) -> Vec<u8> {
+        // Use stable methods for getting bytes from OsStr
+        #[cfg(unix)]
+        {
+            use std::os::unix::ffi::OsStrExt;
+            self.as_os_str().as_bytes().to_vec()
+        }
+        #[cfg(windows)]
+        {
+            use std::os::windows::ffi::OsStrExt;
+            let wide: Vec<u16> = self.as_os_str().encode_wide().collect();
+            wide.iter().flat_map(|&w| w.to_le_bytes()).collect()
+        }
+        #[cfg(not(any(unix, windows)))]
+        {
+            // Fallback for other platforms - convert through string representation
+            self.to_string_lossy().as_bytes().to_vec()
+        }
     }
 
     /// Returns the path as owned encoded bytes.
@@ -202,6 +218,22 @@ impl AppPath {
     /// ```
     #[inline]
     pub fn into_bytes(self) -> Vec<u8> {
-        self.into_path_buf().into_os_string().into_encoded_bytes()
+        // Use stable methods for getting bytes from OsString
+        #[cfg(unix)]
+        {
+            use std::os::unix::ffi::OsStringExt;
+            self.into_path_buf().into_os_string().into_vec()
+        }
+        #[cfg(windows)]
+        {
+            use std::os::windows::ffi::OsStrExt;
+            let wide: Vec<u16> = self.as_os_str().encode_wide().collect();
+            wide.iter().flat_map(|&w| w.to_le_bytes()).collect()
+        }
+        #[cfg(not(any(unix, windows)))]
+        {
+            // Fallback for other platforms - convert through string representation
+            self.to_string_lossy().into_owned().into_bytes()
+        }
     }
 }

@@ -456,12 +456,12 @@ fn test_to_bytes_basic() {
 }
 
 #[test]
-fn test_to_bytes_returns_slice() {
+fn test_to_bytes_returns_vec() {
     let path = app_path!("test.txt");
     let bytes = path.to_bytes();
 
-    // Should return &[u8]
-    let _slice: &[u8] = bytes;
+    // Should return Vec<u8>
+    let _vec: Vec<u8> = bytes.clone();
 
     // Should be able to iterate over bytes
     let byte_count = bytes.len();
@@ -546,14 +546,14 @@ fn test_bytes_consistency_between_methods() {
     let path1 = app_path!("consistency_test.toml");
     let path2 = app_path!("consistency_test.toml");
 
-    // Get borrowed bytes from first path
-    let borrowed_bytes = path1.to_bytes();
+    // Get bytes from first path (now returns Vec<u8>)
+    let first_bytes = path1.to_bytes();
 
     // Get owned bytes from second path
     let owned_bytes = path2.into_bytes();
 
     // Should contain identical data
-    assert_eq!(borrowed_bytes, owned_bytes.as_slice());
+    assert_eq!(first_bytes, owned_bytes);
 }
 
 #[test]
@@ -631,4 +631,35 @@ fn test_bytes_platform_encoding() {
     // Length should be reasonable (not zero, not excessive)
     assert!(!bytes.is_empty());
     assert!(bytes.len() < 10000); // Reasonable upper bound for most paths
+}
+
+#[test]
+fn test_bytes_cross_platform_compatibility() {
+    // This test ensures our byte conversion methods use only stable Rust APIs
+    // and work correctly across all platforms supported by GitHub Actions
+    let path = app_path!("test-file.txt");
+
+    // Test to_bytes() returns Vec<u8>
+    let bytes = path.to_bytes();
+    let _vec_check: Vec<u8> = bytes.clone(); // Verify return type
+    assert!(!bytes.is_empty());
+
+    // Test into_bytes() returns Vec<u8> and consumes the path
+    let path2 = app_path!("test-file.txt");
+    let owned_bytes = path2.into_bytes();
+    let _vec_check2: Vec<u8> = owned_bytes.clone(); // Verify return type
+    assert!(!owned_bytes.is_empty());
+
+    // Both methods should produce identical results
+    assert_eq!(bytes, owned_bytes);
+
+    // Test with platform-specific path separators and special characters
+    let complex_path = app_path!("földer/subfōlder/file-名前.txt");
+    let complex_bytes = complex_path.to_bytes();
+    assert!(!complex_bytes.is_empty());
+
+    // Verify bytes are deterministic (same path = same bytes)
+    let path3 = app_path!("földer/subfōlder/file-名前.txt");
+    let bytes3 = path3.to_bytes();
+    assert_eq!(complex_bytes, bytes3);
 }

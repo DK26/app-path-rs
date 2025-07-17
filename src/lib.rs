@@ -140,8 +140,8 @@
 //! use typed_path::{WindowsPath, UnixPath};
 //!
 //! let dist_dir = app_path!("dist");
-//! let win_path = WindowsPath::new(dist_dir.to_bytes());
-//! let unix_path = UnixPath::new(dist_dir.to_bytes());
+//! let win_path = WindowsPath::new(&dist_dir.to_bytes());
+//! let unix_path = UnixPath::new(&dist_dir.to_bytes());
 //! # Ok::<(), Box<dyn std::error::Error>>(())
 //! ```
 //!

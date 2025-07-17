@@ -9,10 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - **Byte conversion methods** - New methods for low-level path operations
-  - `to_bytes()` - Returns `&[u8]` slice of platform-specific encoded path bytes
+  - `to_bytes()` - Returns `Vec<u8>` of platform-specific encoded path bytes
   - `into_bytes()` - Returns owned `Vec<u8>` of platform-specific encoded path bytes
   - Platform-specific encoding for maximum compatibility with system APIs
   - Comprehensive documentation with safety notes about platform-specific usage
+  - Uses stable Rust APIs for cross-platform compatibility
 - **`into_path_buf()` method** - Explicit method for extracting owned `PathBuf`
   - Provides clear return type indication for better API discoverability
   - Complements existing `into_inner()` method with more descriptive naming
@@ -31,11 +32,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Added ecosystem integration examples including byte conversion usage
 
 ### Testing
-- **Comprehensive byte method test coverage** - 14 focused tests for new byte conversion methods
+- **Comprehensive byte method test coverage** - 15 focused tests for new byte conversion methods
   - Tests for both `to_bytes()` and `into_bytes()` functionality
   - Unicode and special character handling validation
   - Platform encoding consistency verification
   - Ownership and memory safety validation
+  - Cross-platform compatibility verification to ensure stable Rust API usage
 
 ## [0.2.7] - 2025-07-16
 
