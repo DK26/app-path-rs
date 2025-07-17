@@ -100,11 +100,33 @@ impl AppPath {
         Self::new(self.full_path.with_extension(ext))
     }
 
-    /// Consumes the `AppPath` and returns the inner `PathBuf`.
+    /// Consumes the `AppPath` and returns the internal `PathBuf`.
     ///
     /// This provides zero-cost extraction of the underlying `PathBuf` by moving
     /// it out of the wrapper. This is useful when you need owned access to the
     /// path for operations that consume `PathBuf`.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use app_path::AppPath;
+    /// use std::path::PathBuf;
+    ///
+    /// let app_path = AppPath::new("config.toml");
+    /// let path_buf: PathBuf = app_path.into_path_buf();
+    ///
+    /// // Now you have a regular PathBuf for operations that need ownership
+    /// assert!(path_buf.is_absolute());
+    /// ```
+    #[inline]
+    pub fn into_path_buf(self) -> std::path::PathBuf {
+        self.full_path
+    }
+
+    /// Consumes the `AppPath` and returns the internal `PathBuf`.
+    ///
+    /// This is an alias for [`into_path_buf()`](Self::into_path_buf) following
+    /// the standard Rust pattern for extracting wrapped values.
     ///
     /// # Examples
     ///
@@ -120,6 +142,6 @@ impl AppPath {
     /// ```
     #[inline]
     pub fn into_inner(self) -> std::path::PathBuf {
-        self.full_path
+        self.into_path_buf()
     }
 }

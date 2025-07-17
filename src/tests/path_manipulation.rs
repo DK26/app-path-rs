@@ -335,6 +335,20 @@ fn test_into_inner_basic() {
 }
 
 #[test]
+fn test_into_path_buf_equivalence() {
+    let app_path1 = app_path!("config.toml");
+    let app_path2 = app_path!("config.toml");
+
+    // Both methods should return equivalent results
+    let via_into_inner = app_path1.into_inner();
+    let via_into_path_buf = app_path2.into_path_buf();
+
+    assert_eq!(via_into_inner, via_into_path_buf);
+    assert!(via_into_path_buf.is_absolute());
+    assert!(via_into_path_buf.ends_with("config.toml"));
+}
+
+#[test]
 fn test_into_inner_with_nested_path() {
     let app_path = app_path!("config/settings/app.toml");
     let expected_path = app_path.to_path_buf();

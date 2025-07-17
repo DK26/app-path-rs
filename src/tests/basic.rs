@@ -71,12 +71,16 @@ fn handles_dot_and_dotdot_components() {
 }
 
 #[test]
-fn as_ref_and_into_pathbuf_are_consistent() {
+fn as_ref_and_into_conversions_are_consistent() {
     let rel = "somefile.txt";
     let rel_path = AppPath::new(rel);
-    let as_ref_path: &Path = rel_path.as_ref();
     let into_pathbuf: PathBuf = rel_path.clone().into();
-    assert_eq!(as_ref_path, into_pathbuf.as_path());
+    assert_eq!(&*rel_path, into_pathbuf.as_path());
+
+    // Test the new into_path_buf method
+    let rel_path2 = AppPath::new(rel);
+    let path_buf = rel_path2.into_path_buf();
+    assert_eq!(&*rel_path, path_buf.as_path());
 }
 
 #[test]

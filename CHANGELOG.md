@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **`into_path_buf()` method** - Explicit method for extracting owned `PathBuf`
+  - Provides clear return type indication for better API discoverability
+  - Complements existing `into_inner()` method with more descriptive naming
+  - Both methods perform zero-cost extraction of the internal `PathBuf`
+
+### Enhanced
+- **Documentation improvements** - Fixed misleading async example in library documentation
+  - Replaced pointless async function example with practical iterator/closure usage
+  - Better demonstrates real-world variable capture benefits of the macro system
+- **Test coverage** - Added comprehensive test for `into_path_buf()` equivalence with `into_inner()`
+
 ## [0.2.7] - 2025-07-16
 
 ### Deprecated
