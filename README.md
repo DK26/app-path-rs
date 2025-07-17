@@ -29,11 +29,11 @@ if !config.exists() {
 
 ## Why Choose AppPath?
 
-| Approach           | Problem                            | AppPath Solution                |
-| ------------------ | ---------------------------------- | ------------------------------- |
-| Hardcoded paths    | Breaks when moved                  | ✅ Works anywhere                |
-| `current_dir()`    | Depends on where user runs program | ✅ Always relative to executable |
-| System directories | Scatters files across system       | ✅ Self-contained, portable      |
+| Approach           | Problem                                                 | AppPath Solution                                 |
+| ------------------ | ------------------------------------------------------- | ------------------------------------------------ |
+| Hardcoded paths    | Breaks when moved                                       | ✅ Works anywhere                                 |
+| `current_dir()`    | Depends on where user runs program                      | ✅ Always relative to executable                  |
+| System directories | Scatters files across system                            | ✅ Self-contained, portable                       |
 | `current_exe()`    | Manual path joining, no caching, verbose error handling | ✅ Clean API, automatic caching, ergonomic macros |
 
 ## Features
@@ -84,66 +84,29 @@ logs.create_parents()?;              // Creates logs/ for the file
 app_path!("temp").create_dir()?;     // Creates temp/ directory itself
 ```
 
-### Fallible `try_app_path!` Macro (Libraries)
-
-For libraries requiring explicit error handling:
+### Fallible `try_app_path!` Macro
 
 ```rust
-use app_path::{try_app_path, AppPathError};
+use app_path::try_app_path;
 
-// Returns Result<AppPath, AppPathError> instead of panicking
 let config = try_app_path!("config.toml")?;
 let database = try_app_path!("data/users.db", env = "DATABASE_PATH")?;
 
-// Variable capturing with error handling
-let version = "1.0";
-let versioned_cache = try_app_path!(format!("cache-{version}"))?;
-
-// Graceful error handling
+// Error handling
 match try_app_path!("logs/app.log") {
     Ok(log_path) => log_path.create_parents()?,
-    Err(e) => eprintln!("Failed to determine log path: {e}"),
+    Err(e) => eprintln!("Failed: {e}"),
 }
 ```
 
-### Constructor API (Alternative)
+### Constructor API
 
 ```rust
 use app_path::AppPath;
 
 let config = AppPath::new("config.toml");
 let database = AppPath::with_override("data/users.db", std::env::var("DB_PATH").ok());
-
-// For libraries requiring fallible behavior
-let config = AppPath::try_new("config.toml")?;
-```
-
-## Error Handling
-
-AppPath uses **fail-fast by default** for better developer experience:
-
-- **`app_path!` and `AppPath::new()`** - Panic on critical system errors (executable location undetermined)
-- **`try_app_path!` and `AppPath::try_new()`** - Return `Result` for explicit error handling
-
-This design makes sense because if the system can't determine your executable location, there's usually no point continuing - it indicates severe system corruption or unsupported platforms.
-
-**For most applications**: Use the panicking variants (`app_path!`) - they fail fast on unrecoverable errors.
-
-**For libraries**: Use the fallible variants (`try_app_path!`) to let callers handle errors gracefully.
-
-```rust
-use app_path::{AppPath, AppPathError};
-
-// Libraries should handle errors explicitly
-match AppPath::try_new("config.toml") {
-    Ok(path) => println!("Config: {}", path.display()),
-    Err(AppPathError::ExecutableNotFound(msg)) => {
-        eprintln!("Cannot find executable: {msg}");
-    }
-    Err(AppPathError::InvalidExecutablePath(msg)) => {
-        eprintln!("Invalid executable path: {msg}");
-    }
-}
+let config = AppPath::try_new("config.toml")?; // Fallible
 ```
 
 ## Real-World Examples
@@ -197,25 +160,33 @@ let logs = if cfg!(debug_assertions) {
 };
 ```
 
-## Directory Creation
+## Error Handling
+
+AppPath uses **fail-fast by default** for better developer experience:
+
+- **`app_path!` and `AppPath::new()`** - Panic on critical system errors (executable location undetermined)
+- **`try_app_path!` and `AppPath::try_new()`** - Return `Result` for explicit error handling
+
+This design makes sense because if the system can't determine your executable location, there's usually no point continuing - it indicates severe system corruption or unsupported platforms.
+
+**For most applications**: Use the panicking variants (`app_path!`) - they fail fast on unrecoverable errors.
+
+**For libraries**: Use the fallible variants (`try_app_path!`) to let callers handle errors gracefully.
 
 ```rust
-use app_path::app_path;
+use app_path::{AppPath, AppPathError};
 
-// Preparing to write files
-let log_file = app_path!("logs/app.log");
-log_file.create_parents()?; // Creates logs/ directory
-
-// Creating directories
-let cache_dir = app_path!("cache");
-cache_dir.create_dir()?; // Creates cache/ directory
+// Libraries should handle errors explicitly
+match AppPath::try_new("config.toml") {
+    Ok(path) => println!("Config: {}", path.display()),
+    Err(AppPathError::ExecutableNotFound(msg)) => {
+        eprintln!("Cannot find executable: {msg}");
+    }
+    Err(AppPathError::InvalidExecutablePath(msg)) => {
+        eprintln!("Invalid executable path: {msg}");
+    }
+}
 ```
-
-## Path Resolution
-
-- **Relative paths** → executable directory: `"config.toml"` → `./config.toml`
-- **Absolute paths** → used as-is: `"/etc/app.conf"` → `/etc/app.conf`
-- **Environment overrides** → replace default when set
 
 ## Ecosystem Integration
 
@@ -225,8 +196,8 @@ cache_dir.create_dir()?; // Creates cache/ directory
 
 | Crate                                                   | Use Case                           | Integration Pattern                |
 | ------------------------------------------------------- | ---------------------------------- | ---------------------------------- |
-| **[`camino`](https://crates.io/crates/camino)**         | UTF-8 path guarantees for web apps | `Utf8PathBuf::try_from(app_path)?` |
-| **[`typed-path`](https://crates.io/crates/typed-path)** | Cross-platform type-safe paths     | `WindowsPath::new(&app_path)`      |
+| **[`camino`](https://crates.io/crates/camino)**         | UTF-8 path guarantees for web apps | `Utf8PathBuf::from_path_buf(app_path.into())?` |
+| **[`typed-path`](https://crates.io/crates/typed-path)** | Cross-platform type-safe paths     | `WindowsPath::new(app_path.to_bytes())` |
 
 ### 📝 **Real-World Integration Examples**
 
@@ -236,7 +207,8 @@ use app_path::app_path;
 use camino::Utf8PathBuf;
 
 let static_dir = app_path!("web/static", env = "STATIC_DIR");
-let utf8_static = Utf8PathBuf::try_from(static_dir)?;
+let utf8_static = Utf8PathBuf::from_path_buf(static_dir.into())
+    .map_err(|_| "Invalid UTF-8 path")?;
 let config = serde_json::json!({ "static_files": utf8_static });
 ```
 
@@ -246,17 +218,27 @@ use app_path::app_path;
 use typed_path::{WindowsPath, UnixPath};
 
 let dist_dir = app_path!("dist");
-let win_path = WindowsPath::new(&dist_dir);  // Uses \ on Windows
-let unix_path = UnixPath::new(&dist_dir);    // Uses / on Unix
+let path_bytes = dist_dir.to_bytes();
+let win_path = WindowsPath::new(path_bytes);  // Uses \ on Windows
+let unix_path = UnixPath::new(path_bytes);    // Uses / on Unix
 ```
 
-### 🛠 **Migration-Friendly**
+#### ⚙️ **Configuration Files** (with `serde`)
+```rust
+use app_path::AppPath;
+use serde::{Serialize, Deserialize};
 
-Since `AppPath` implements `Deref<Target=Path>` and `AsRef<Path>`, you can:
-- **Drop-in replace** existing `PathBuf` usage
-- **Gradually adopt** without rewriting entire codebases  
-- **Mix and match** with specialized path libraries
-- **Zero runtime overhead** for standard path operations
+#[derive(Serialize, Deserialize)]
+struct Config {
+    log_file: String,    // Standard approach - readable and portable
+    data_dir: String,    // Works across all platforms  
+}
+
+// Convert when using - clean separation of concerns
+let config: Config = serde_json::from_str(&config_json)?;
+let log_path = AppPath::new(&config.log_file);
+let data_path = AppPath::new(&config.data_dir);
+```
 
 ## Installation
 

@@ -144,4 +144,64 @@ impl AppPath {
     pub fn into_inner(self) -> std::path::PathBuf {
         self.into_path_buf()
     }
+
+    /// Returns the path as encoded bytes for low-level path operations.
+    ///
+    /// This provides access to the platform-specific byte representation of the path.
+    /// The returned bytes use an unspecified, platform-specific encoding and are only
+    /// valid within the same Rust version and target platform.
+    ///
+    /// **Safety Note**: These bytes should not be sent over networks, stored in files,
+    /// or used across different platforms, as the encoding is implementation-specific.
+    ///
+    /// Use cases include:
+    /// - **Platform-specific path parsing** with precise byte-level control
+    /// - **Custom path validation** that works with raw path bytes
+    /// - **Integration with platform APIs** that expect encoded path bytes
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use app_path::AppPath;
+    ///
+    /// let config = AppPath::new("config.toml");
+    /// let bytes = config.to_bytes();
+    ///
+    /// // Platform-specific byte operations
+    /// assert!(!bytes.is_empty());
+    /// ```
+    #[inline]
+    pub fn to_bytes(&self) -> &[u8] {
+        self.as_os_str().as_encoded_bytes()
+    }
+
+    /// Returns the path as owned encoded bytes.
+    ///
+    /// This consumes the AppPath and returns owned bytes using the same platform-specific
+    /// encoding as `to_bytes()`. The returned bytes are only valid within the same
+    /// Rust version and target platform.
+    ///
+    /// **Safety Note**: These bytes should not be sent over networks, stored in files,
+    /// or used across different platforms, as the encoding is implementation-specific.
+    ///
+    /// Use cases include:
+    /// - **Moving path data** across ownership boundaries
+    /// - **Temporary storage** of path bytes during processing
+    /// - **Platform-specific algorithms** requiring owned byte data
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use app_path::AppPath;
+    ///
+    /// let config = AppPath::new("config.toml");
+    /// let owned_bytes = config.into_bytes();
+    ///
+    /// // Owned bytes can be moved and stored
+    /// assert!(!owned_bytes.is_empty());
+    /// ```
+    #[inline]
+    pub fn into_bytes(self) -> Vec<u8> {
+        self.into_path_buf().into_os_string().into_encoded_bytes()
+    }
 }

@@ -438,3 +438,197 @@ fn test_into_inner_with_override() {
     assert_eq!(inner_path_default, expected_default);
     assert!(inner_path_default.ends_with("config.toml"));
 }
+
+// === Byte Conversion Tests ===
+
+#[test]
+fn test_to_bytes_basic() {
+    let path = app_path!("config.toml");
+    let bytes = path.to_bytes();
+
+    // Basic byte functionality
+    assert!(!bytes.is_empty());
+    assert!(!bytes.is_empty());
+
+    // Should be able to get bytes multiple times
+    let bytes2 = path.to_bytes();
+    assert_eq!(bytes, bytes2);
+}
+
+#[test]
+fn test_to_bytes_returns_slice() {
+    let path = app_path!("test.txt");
+    let bytes = path.to_bytes();
+
+    // Should return &[u8]
+    let _slice: &[u8] = bytes;
+
+    // Should be able to iterate over bytes
+    let byte_count = bytes.len();
+    assert_eq!(byte_count, bytes.len());
+}
+
+#[test]
+fn test_to_bytes_with_unicode() {
+    let path = app_path!("配置.toml");
+    let bytes = path.to_bytes();
+
+    // Unicode paths should produce valid bytes
+    assert!(!bytes.is_empty());
+
+    // Bytes should be different from ASCII-only path
+    let ascii_path = app_path!("config.toml");
+    let ascii_bytes = ascii_path.to_bytes();
+    assert_ne!(bytes, ascii_bytes);
+}
+
+#[test]
+fn test_to_bytes_with_special_chars() {
+    let path = app_path!("config with spaces.toml");
+    let bytes = path.to_bytes();
+
+    // Special characters should be encoded in bytes
+    assert!(!bytes.is_empty());
+
+    // Different from path without spaces
+    let no_spaces = app_path!("config.toml");
+    assert_ne!(bytes, no_spaces.to_bytes());
+}
+
+#[test]
+fn test_into_bytes_basic() {
+    let path = app_path!("config.toml");
+    let original_bytes = path.to_bytes().to_vec();
+
+    // Recreate path since into_bytes consumes it
+    let path2 = app_path!("config.toml");
+    let owned_bytes = path2.into_bytes();
+
+    // Should return Vec<u8> with same content
+    assert_eq!(owned_bytes, original_bytes);
+    assert!(!owned_bytes.is_empty());
+}
+
+#[test]
+fn test_into_bytes_returns_vec() {
+    let path = app_path!("test.txt");
+    let owned_bytes = path.into_bytes();
+
+    // Should return Vec<u8>
+    let _vec: Vec<u8> = owned_bytes.clone();
+
+    // Should be able to use Vec methods
+    assert!(owned_bytes.capacity() >= owned_bytes.len());
+    let mut mutable_bytes = owned_bytes;
+    mutable_bytes.push(0); // Should be able to mutate
+    assert!(!mutable_bytes.is_empty());
+}
+
+#[test]
+fn test_into_bytes_ownership() {
+    let path = app_path!("config.toml");
+    let owned_bytes = path.into_bytes();
+
+    // Should be able to move the bytes
+    let moved_bytes = owned_bytes;
+    assert!(!moved_bytes.is_empty());
+
+    // Should be able to pass to functions expecting Vec<u8>
+    fn takes_owned_bytes(bytes: Vec<u8>) -> usize {
+        bytes.len()
+    }
+    let len = takes_owned_bytes(moved_bytes);
+    assert!(len > 0);
+}
+
+#[test]
+fn test_bytes_consistency_between_methods() {
+    let path1 = app_path!("consistency_test.toml");
+    let path2 = app_path!("consistency_test.toml");
+
+    // Get borrowed bytes from first path
+    let borrowed_bytes = path1.to_bytes();
+
+    // Get owned bytes from second path
+    let owned_bytes = path2.into_bytes();
+
+    // Should contain identical data
+    assert_eq!(borrowed_bytes, owned_bytes.as_slice());
+}
+
+#[test]
+fn test_bytes_different_paths_different_bytes() {
+    let path1 = app_path!("file1.txt");
+    let path2 = app_path!("file2.txt");
+
+    let bytes1 = path1.to_bytes();
+    let bytes2 = path2.to_bytes();
+
+    // Different paths should produce different bytes
+    assert_ne!(bytes1, bytes2);
+}
+
+#[test]
+fn test_bytes_same_path_same_bytes() {
+    let path1 = app_path!("same.txt");
+    let path2 = app_path!("same.txt");
+
+    let bytes1 = path1.to_bytes();
+    let bytes2 = path2.to_bytes();
+
+    // Same logical path should produce same bytes
+    assert_eq!(bytes1, bytes2);
+}
+
+#[test]
+fn test_bytes_with_path_operations() {
+    let base = app_path!("config");
+    let joined = base.join("app.toml");
+
+    let base_bytes = base.to_bytes();
+    let joined_bytes = joined.to_bytes();
+
+    // Joined path bytes should be different and longer
+    assert_ne!(base_bytes, joined_bytes);
+    assert!(joined_bytes.len() > base_bytes.len());
+}
+
+#[test]
+fn test_bytes_with_extension_changes() {
+    let original = app_path!("config.toml");
+    let with_json = original.with_extension("json");
+
+    let original_bytes = original.to_bytes();
+    let json_bytes = with_json.to_bytes();
+
+    // Extension change should result in different bytes
+    assert_ne!(original_bytes, json_bytes);
+}
+
+#[test]
+fn test_bytes_empty_scenarios() {
+    // Test with minimal path
+    let minimal = app_path!("a");
+    let bytes = minimal.to_bytes();
+    assert!(!bytes.is_empty());
+
+    // Even minimal paths should have some byte representation
+    assert!(!bytes.is_empty());
+}
+
+#[test]
+fn test_bytes_platform_encoding() {
+    let path = app_path!("test.txt");
+    let bytes = path.to_bytes();
+
+    // Bytes should be valid platform-specific encoding
+    assert!(!bytes.is_empty());
+
+    // Should be consistent across multiple calls
+    let bytes2 = path.to_bytes();
+    assert_eq!(bytes, bytes2);
+
+    // Length should be reasonable (not zero, not excessive)
+    assert!(!bytes.is_empty());
+    assert!(bytes.len() < 10000); // Reasonable upper bound for most paths
+}
