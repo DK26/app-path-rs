@@ -1,4 +1,4 @@
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use crate::{try_exe_dir, AppPath, AppPathError};
 
@@ -207,8 +207,8 @@ impl AppPath {
     ///     let data = AppPath::try_with("data/app.db")?;
     ///     
     ///     // Initialize application with these paths
-    ///     println!("Config: {}", config.path().display());
-    ///     println!("Data: {}", data.path().display());
+    ///     println!("Config: {}", config.display());
+    ///     println!("Data: {}", data.display());
     ///     
     ///     Ok(())
     /// }
@@ -277,21 +277,6 @@ impl AppPath {
         let exe_dir = try_exe_dir()?;
         let full_path = exe_dir.join(path);
         Ok(Self { full_path })
-    }
-
-    /// Creates an AppPath from an absolute path.
-    ///
-    /// This is an internal helper for operations that need to create AppPath
-    /// instances from already-resolved absolute paths (like join, with_extension, etc).
-    ///
-    /// # Arguments
-    ///
-    /// * `path` - An absolute path that will be stored directly
-    #[inline]
-    pub(crate) fn from_absolute_path(path: impl Into<PathBuf>) -> Self {
-        Self {
-            full_path: path.into(),
-        }
     }
 
     /// Creates file paths relative to the application's base directory.

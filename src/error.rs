@@ -34,7 +34,7 @@ use std::path::PathBuf;
 /// // Handle errors explicitly
 /// match AppPath::try_with("config.toml") {
 ///     Ok(config) => {
-///         println!("Config path: {}", config.path().display());
+///         println!("Config path: {}", config.display());
 ///     }
 ///     Err(AppPathError::ExecutableNotFound(msg)) => {
 ///         eprintln!("Cannot find executable: {msg}");

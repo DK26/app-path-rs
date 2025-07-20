@@ -8,12 +8,12 @@
 //! use app_path::app_path;
 //!
 //! // Files relative to your executable - not current directory!
-//! let config = app_path!("config.toml");        // → /path/to/exe/config.toml
-//! let database = app_path!("data/users.db");    // → /path/to/exe/data/users.db
+//! let config = app_path!("config.toml");     // → /path/to/exe_dir/config.toml
+//! let database = app_path!("data/users.db"); // → /path/to/exe_dir/data/users.db
 //!
 //! // Environment overrides for deployment
 //! let logs = app_path!("logs/app.log", env = "LOG_PATH");
-//! // → Uses LOG_PATH if set, otherwise /path/to/exe/logs/app.log
+//! // → Uses LOG_PATH if set, otherwise /path/to/exe_dir/logs/app.log
 //!
 //! // Works like standard paths - all Path methods available
 //! if config.exists() {
@@ -21,8 +21,8 @@
 //! }
 //!
 //! // Directory creation
-//! logs.create_parents()?;                 // Creates logs/ directory for the file
-//! app_path!("cache").create_dir()?;       // Creates cache/ directory itself
+//! logs.create_parents()?;            // Creates logs/ directory for the file
+//! app_path!("cache").create_dir()?;  // Creates cache/ directory itself
 //! # Ok::<(), Box<dyn std::error::Error>>(())
 //! ```
 //!
@@ -86,21 +86,21 @@
 //! # use app_path::{app_path, try_app_path};
 //! // 1. Direct value
 //! let config = app_path!("config.toml");
-//! // → /path/to/exe/config.toml
+//! // → /path/to/exe_dir/config.toml
 //!
 //! // 2. With environment override
 //! let config = app_path!("config.toml", env = "CONFIG_PATH");
-//! // → Uses CONFIG_PATH if set, otherwise /path/to/exe/config.toml
+//! // → Uses CONFIG_PATH if set, otherwise /path/to/exe_dir/config.toml
 //!
 //! // 3. With optional override value
 //! let config = app_path!("config.toml", override = std::env::var("CONFIG_PATH").ok());
-//! // → Uses CONFIG_PATH if available, otherwise /path/to/exe/config.toml
+//! // → Uses CONFIG_PATH if available, otherwise /path/to/exe_dir/config.toml
 //!
 //! // 4. With function-based override
 //! let config = app_path!("config.toml", fn = || {
 //!     std::env::var("CONFIG_PATH").ok()
 //! });
-//! // → Uses function result if Some, otherwise /path/to/exe/config.toml
+//! // → Uses function result if Some, otherwise /path/to/exe_dir/config.toml
 //! ```
 //!
 //! ### Variable Capturing in Macros

@@ -3,37 +3,6 @@ use std::path::Path;
 use crate::AppPath;
 
 impl AppPath {
-    /// Get the full resolved path.
-    ///
-    /// This is the primary method for getting the actual filesystem path
-    /// where your file or directory is located.
-    ///
-    /// # Examples
-    ///
-    /// ```rust
-    /// use app_path::AppPath;
-    ///
-    /// let config = AppPath::with("config.toml");
-    ///
-    /// // For displaying paths - use Display trait
-    /// println!("Config path: {}", config.display());
-    ///
-    /// // For getting &Path reference - use deref
-    /// assert!(config.is_absolute());
-    ///
-    /// // For functions expecting &Path - use as_ref() or &config
-    /// std::fs::write(&config, "content")?;
-    /// # Ok::<(), std::io::Error>(())
-    /// ```
-    #[deprecated(
-        since = "0.2.7",
-        note = "Use `&app_path` or `app_path.as_ref()` instead. AppPath implements Deref<Target=Path>, so all Path methods are directly available."
-    )]
-    #[inline]
-    pub fn path(&self) -> &Path {
-        &self.full_path
-    }
-
     /// Joins additional path segments to create a new AppPath.
     ///
     /// This creates a new `AppPath` by joining the current path with additional segments.
@@ -55,7 +24,9 @@ impl AppPath {
     /// ```
     #[inline]
     pub fn join(&self, path: impl AsRef<Path>) -> Self {
-        Self::from_absolute_path(self.full_path.join(path))
+        Self {
+            full_path: self.full_path.join(path),
+        }
     }
 
     /// Returns the parent directory as an AppPath, if it exists.
@@ -75,7 +46,7 @@ impl AppPath {
     /// ```
     #[inline]
     pub fn parent(&self) -> Option<Self> {
-        self.full_path.parent().map(Self::from_absolute_path)
+        self.full_path.parent().map(Self::with)
     }
 
     /// Creates a new AppPath with the specified file extension.
@@ -97,7 +68,7 @@ impl AppPath {
     /// ```
     #[inline]
     pub fn with_extension(&self, ext: &str) -> Self {
-        Self::from_absolute_path(self.full_path.with_extension(ext))
+        Self::with(self.full_path.with_extension(ext))
     }
 
     /// Consumes the `AppPath` and returns the internal `PathBuf`.

@@ -13,12 +13,12 @@ Simple, zero-dependency library for creating portable applications where configu
 use app_path::app_path;
 
 // Files relative to your executable - not current directory!
-let config = app_path!("config.toml");        // → /path/to/exe/config.toml
-let database = app_path!("data/users.db");    // → /path/to/exe/data/users.db
+let config = app_path!("config.toml");      // → /path/to/exe_dir/config.toml
+let database = app_path!("data/users.db");  // → /path/to/exe_dir/data/users.db
 
 // Environment override for deployment
 let logs = app_path!("logs/app.log", env = "LOG_PATH");
-// → Uses LOG_PATH if set, otherwise /path/to/exe/logs/app.log
+// → Uses LOG_PATH if set, otherwise /path/to/exe_dir/logs/app.log
 
 // Acts like std::path::Path + creates directories
 if !config.exists() {
@@ -54,7 +54,7 @@ if !config.exists() {
 use app_path::app_path;
 
 // Application base directory
-let app_base = app_path!();                     // → /path/to/exe/
+let app_base = app_path!();  // → /path/to/exe_dir/
 
 // Simple paths
 let config = app_path!("config.toml");
@@ -83,8 +83,8 @@ let version = "1.0";
 let versioned_cache = app_path!(format!("cache-{version}"));
 
 // Directory creation
-logs.create_parents()?;              // Creates logs/ for the file
-app_path!("temp").create_dir()?;     // Creates temp/ directory itself
+app_path!("logs/app.log").create_parents()?;  // Creates `logs/` for the `app.log` file
+app_path!("temp").create_dir()?;  // Creates `temp/` directory itself
 ```
 
 ### Fallible `try_app_path!` Macro
@@ -92,7 +92,8 @@ app_path!("temp").create_dir()?;     // Creates temp/ directory itself
 ```rust
 use app_path::try_app_path;
 
-let app_base = try_app_path!()?;                                     // Fallible base directory
+// Fallible base directory
+let app_base = try_app_path!()?;  
 let config = try_app_path!("config.toml")?;
 let database = try_app_path!("data/users.db", env = "DATABASE_PATH")?;
 
@@ -109,9 +110,9 @@ match try_app_path!("logs/app.log") {
 use app_path::AppPath;
 
 // Basic constructors
-let app_base = AppPath::new();                          // Executable directory
-let config = AppPath::with("config.toml");              // App base + path
-let database = AppPath::try_with("data/users.db")?;     // Fallible version
+let app_base = AppPath::new();                       // Executable directory
+let config = AppPath::with("config.toml");           // App base + path
+let database = AppPath::try_with("data/users.db")?;  // Fallible version
 
 // Override constructors
 let config = AppPath::with_override("config.toml", std::env::var("CONFIG_PATH").ok());
@@ -186,7 +187,7 @@ This design makes sense because if the system can't determine your executable lo
 use app_path::{AppPath, AppPathError};
 
 // Libraries should handle errors explicitly
-match AppPath::try_new("config.toml") {
+match AppPath::try_with("config.toml") {
     Ok(path) => println!("Config: {}", path.display()),
     Err(AppPathError::ExecutableNotFound(msg)) => {
         eprintln!("Cannot find executable: {msg}");
@@ -203,10 +204,10 @@ match AppPath::try_new("config.toml") {
 
 ### 🔗 **Popular Path Crate Compatibility**
 
-| Crate                                                   | Use Case                           | Integration Pattern                |
-| ------------------------------------------------------- | ---------------------------------- | ---------------------------------- |
+| Crate                                                   | Use Case                           | Integration Pattern                            |
+| ------------------------------------------------------- | ---------------------------------- | ---------------------------------------------- |
 | **[`camino`](https://crates.io/crates/camino)**         | UTF-8 path guarantees for web apps | `Utf8PathBuf::from_path_buf(app_path.into())?` |
-| **[`typed-path`](https://crates.io/crates/typed-path)** | Cross-platform type-safe paths     | `WindowsPath::new(app_path.to_bytes())` |
+| **[`typed-path`](https://crates.io/crates/typed-path)** | Cross-platform type-safe paths     | `WindowsPath::new(app_path.to_bytes())`        |
 
 ### 📝 **Real-World Integration Examples**
 
