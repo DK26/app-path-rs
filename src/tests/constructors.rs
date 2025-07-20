@@ -13,14 +13,14 @@ fn test_new_constructor() {
     // Should match what std::env::current_exe() tells us (independent verification)
     let current_exe = std::env::current_exe().unwrap();
     let exe_parent = current_exe.parent().unwrap();
-    assert_eq!(app_base.path(), exe_parent);
+    assert_eq!(&*app_base, exe_parent);
 
     // Should be a directory, not a file
     assert!(app_base.is_dir());
 
     // Should be consistent across multiple calls (caching)
     let app_base2 = AppPath::new();
-    assert_eq!(app_base.path(), app_base2.path());
+    assert_eq!(app_base, app_base2);
 }
 
 #[test]
@@ -36,11 +36,11 @@ fn test_try_new_constructor() {
     // Should match what std::env::current_exe() tells us (independent verification)
     let current_exe = std::env::current_exe().unwrap();
     let exe_parent = current_exe.parent().unwrap();
-    assert_eq!(app_base.path(), exe_parent);
+    assert_eq!(&*app_base, exe_parent);
 
     // Should be consistent with panicking version
     let panicking_version = AppPath::new();
-    assert_eq!(app_base.path(), panicking_version.path());
+    assert_eq!(app_base, panicking_version);
 
     // Should be a directory, not a file
     assert!(app_base.is_dir());
@@ -60,15 +60,15 @@ fn test_new_with_different_types() {
     let from_path_ref = AppPath::from(Path::new("test.txt"));
 
     // All should produce equivalent results
-    assert_eq!(from_str.path(), from_string.path());
-    assert_eq!(from_string.path(), from_path_buf.path());
-    assert_eq!(from_path_buf.path(), from_path_ref.path());
+    assert_eq!(&from_str, &from_string);
+    assert_eq!(&from_string, &from_path_buf);
+    assert_eq!(&from_path_buf, &from_path_ref);
 
     // Should all resolve to exe_dir + filename (independent verification)
     let current_exe = std::env::current_exe().unwrap();
     let exe_parent = current_exe.parent().unwrap();
     let expected = exe_parent.join("test.txt");
-    assert_eq!(from_str.path(), &expected);
+    assert_eq!(&*from_str, expected);
 }
 
 #[test]
@@ -82,7 +82,7 @@ fn test_ownership_transfer() {
     let current_exe = std::env::current_exe().unwrap();
     let exe_parent = current_exe.parent().unwrap();
     let expected = exe_parent.join("test.txt");
-    assert_eq!(app_path.path(), &expected);
+    assert_eq!(&*app_path, expected);
 
     // Test with String too
     let string_path = "another_test.txt".to_string();
@@ -90,7 +90,7 @@ fn test_ownership_transfer() {
     // string_path is moved and no longer accessible
 
     let expected2 = exe_parent.join("another_test.txt");
-    assert_eq!(app_path2.path(), &expected2);
+    assert_eq!(&*app_path2, expected2);
 }
 
 #[test]
@@ -110,12 +110,12 @@ fn test_from_implementations() {
     let from_pathbuf_ref: AppPath = (&PathBuf::from("test.txt")).into();
 
     // All should produce the same result
-    assert_eq!(from_str.path(), &expected);
-    assert_eq!(from_string.path(), &expected);
-    assert_eq!(from_string_ref.path(), &expected);
-    assert_eq!(from_path.path(), &expected);
-    assert_eq!(from_pathbuf.path(), &expected);
-    assert_eq!(from_pathbuf_ref.path(), &expected);
+    assert_eq!(&*from_str, &expected);
+    assert_eq!(&*from_string, &expected);
+    assert_eq!(&*from_string_ref, &expected);
+    assert_eq!(&*from_path, &expected);
+    assert_eq!(&*from_pathbuf, &expected);
+    assert_eq!(&*from_pathbuf_ref, &expected);
 }
 
 #[test]
@@ -125,7 +125,7 @@ fn test_from_str() {
     let exe_parent = current_exe.parent().unwrap();
     let expected = exe_parent.join("config.toml");
 
-    assert_eq!(rel_path.path(), &expected);
+    assert_eq!(&*rel_path, &expected);
 }
 
 #[test]
@@ -136,7 +136,7 @@ fn test_from_string() {
     let exe_parent = current_exe.parent().unwrap();
     let expected = exe_parent.join("data/file.txt");
 
-    assert_eq!(rel_path.path(), &expected);
+    assert_eq!(&*rel_path, &expected);
 }
 
 #[test]
@@ -147,7 +147,7 @@ fn test_from_string_ref() {
     let exe_parent = current_exe.parent().unwrap();
     let expected = exe_parent.join("logs/app.log");
 
-    assert_eq!(rel_path.path(), &expected);
+    assert_eq!(&*rel_path, &expected);
 }
 
 // === Fallible API Tests ===
@@ -159,11 +159,11 @@ fn test_try_with_success() {
     let current_exe = std::env::current_exe().unwrap();
     let exe_parent = current_exe.parent().unwrap();
     let expected = exe_parent.join("config.toml");
-    assert_eq!(config.path(), &expected);
+    assert_eq!(&*config, &expected);
 
     let data = AppPath::try_with("data/users.db").unwrap();
     let expected = exe_parent.join("data/users.db");
-    assert_eq!(data.path(), &expected);
+    assert_eq!(&*data, &expected);
 }
 
 #[test]
@@ -182,12 +182,12 @@ fn test_try_with_different_types() {
     let current_exe = std::env::current_exe().unwrap();
     let exe_parent = current_exe.parent().unwrap();
     let expected = exe_parent.join("config.toml");
-    assert_eq!(from_str.path(), &expected);
-    assert_eq!(from_string.path(), &expected);
-    assert_eq!(from_string_ref.path(), &expected);
-    assert_eq!(from_path.path(), &expected);
-    assert_eq!(from_pathbuf.path(), &expected);
-    assert_eq!(from_pathbuf_ref.path(), &expected);
+    assert_eq!(&*from_str, &expected);
+    assert_eq!(&*from_string, &expected);
+    assert_eq!(&*from_string_ref, &expected);
+    assert_eq!(&*from_path, &expected);
+    assert_eq!(&*from_pathbuf, &expected);
+    assert_eq!(&*from_pathbuf_ref, &expected);
 }
 
 // === Override Constructor Tests ===
@@ -200,7 +200,7 @@ fn test_with_override_some() {
     let custom_path = temp_dir.join("custom_config.toml");
 
     let config = AppPath::with_override("default.toml", Some(&custom_path));
-    assert_eq!(config.path(), custom_path);
+    assert_eq!(&*config, &custom_path);
 }
 
 #[test]
@@ -211,7 +211,7 @@ fn test_with_override_none() {
     let current_exe = std::env::current_exe().unwrap();
     let exe_parent = current_exe.parent().unwrap();
     let expected = exe_parent.join("default.toml");
-    assert_eq!(config.path(), &expected);
+    assert_eq!(&*config, &expected);
 }
 
 #[test]
@@ -222,7 +222,7 @@ fn test_try_with_override_some() {
     let custom_path = temp_dir.join("custom_config.toml");
 
     let config = AppPath::try_with_override("default.toml", Some(&custom_path)).unwrap();
-    assert_eq!(config.path(), custom_path);
+    assert_eq!(&*config, &custom_path);
 }
 
 #[test]
@@ -233,7 +233,7 @@ fn test_try_with_override_none() {
     let current_exe = std::env::current_exe().unwrap();
     let exe_parent = current_exe.parent().unwrap();
     let expected = exe_parent.join("default.toml");
-    assert_eq!(config.path(), &expected);
+    assert_eq!(&*config, &expected);
 }
 
 #[test]
@@ -244,7 +244,7 @@ fn test_with_override_fn_some() {
     let custom_path = temp_dir.join("custom_fn.toml");
 
     let config = AppPath::with_override_fn("default.toml", || Some(custom_path.clone()));
-    assert_eq!(config.path(), custom_path);
+    assert_eq!(&*config, &custom_path);
 }
 
 #[test]
@@ -255,7 +255,7 @@ fn test_with_override_fn_none() {
     let current_exe = std::env::current_exe().unwrap();
     let exe_parent = current_exe.parent().unwrap();
     let expected = exe_parent.join("default.toml");
-    assert_eq!(config.path(), &expected);
+    assert_eq!(&*config, &expected);
 }
 
 #[test]
@@ -267,7 +267,7 @@ fn test_try_with_override_fn_some() {
 
     let config =
         AppPath::try_with_override_fn("default.toml", || Some(custom_path.clone())).unwrap();
-    assert_eq!(config.path(), custom_path);
+    assert_eq!(&*config, &custom_path);
 }
 
 #[test]
@@ -278,7 +278,7 @@ fn test_try_with_override_fn_none() {
     let current_exe = std::env::current_exe().unwrap();
     let exe_parent = current_exe.parent().unwrap();
     let expected = exe_parent.join("default.toml");
-    assert_eq!(config.path(), &expected);
+    assert_eq!(&*config, &expected);
 }
 
 // === API Consistency Tests ===
@@ -303,6 +303,6 @@ fn test_caching_consistency() {
     let second_call = AppPath::try_new().unwrap();
     let third_call = AppPath::new();
 
-    assert_eq!(first_call.path(), second_call.path());
-    assert_eq!(second_call.path(), third_call.path());
+    assert_eq!(&*first_call, &*second_call);
+    assert_eq!(&*second_call, &*third_call);
 }

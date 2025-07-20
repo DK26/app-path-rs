@@ -53,7 +53,7 @@ fn test_parent() {
     let parent_of_root = root_file.parent().unwrap();
     // Parent should be the exe directory
     assert_eq!(
-        parent_of_root.path(),
+        &*parent_of_root,
         std::env::current_exe().unwrap().parent().unwrap()
     );
 }
@@ -290,10 +290,7 @@ fn test_root_file_manipulation() {
 
     // Should be able to get parent (exe directory)
     let parent = root_file.parent().unwrap();
-    assert_eq!(
-        parent.path(),
-        std::env::current_exe().unwrap().parent().unwrap()
-    );
+    assert_eq!(&*parent, std::env::current_exe().unwrap().parent().unwrap());
 
     // Should be able to change extension
     let json_version = root_file.with_extension("json");

@@ -65,7 +65,7 @@ fn test_fallible_api_documentation_examples() {
     // Example 1: Basic error handling pattern
     match AppPath::try_with("config.toml") {
         Ok(config) => {
-            assert!(config.path().ends_with("config.toml"));
+            assert!(config.ends_with("config.toml"));
         }
         Err(_e) => {
             // In our test environment, this shouldn't happen
@@ -80,7 +80,7 @@ fn test_fallible_api_documentation_examples() {
     }
 
     let config = load_config().unwrap();
-    assert!(config.path().ends_with("config.toml"));
+    assert!(config.ends_with("config.toml"));
 
     // Example 3: Fallback strategy
     fn get_config_with_fallback() -> AppPath {
@@ -92,7 +92,7 @@ fn test_fallible_api_documentation_examples() {
 
     let config = get_config_with_fallback();
     // Should succeed in either case
-    assert!(config.path().is_absolute());
+    assert!(config.is_absolute());
 }
 
 #[test]
