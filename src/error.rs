@@ -32,7 +32,7 @@ use std::path::PathBuf;
 /// use app_path::{AppPath, AppPathError};
 ///
 /// // Handle errors explicitly
-/// match AppPath::try_new("config.toml") {
+/// match AppPath::try_with("config.toml") {
 ///     Ok(config) => {
 ///         println!("Config path: {}", config.path().display());
 ///     }

@@ -12,6 +12,30 @@ use std::path::{Path, PathBuf};
 
 // === Core Display and Conversion Traits ===
 
+/// Default implementation returns the executable's directory.
+///
+/// This provides a natural default for AppPath - the directory where
+/// the executable is located.
+///
+/// # Examples
+///
+/// ```rust
+/// use app_path::AppPath;
+/// use std::path::Path;
+///
+/// let exe_dir = AppPath::default();
+/// let explicit = AppPath::new();
+/// assert_eq!(exe_dir.as_ref() as &Path, explicit.as_ref() as &Path);
+/// ```
+impl Default for AppPath {
+    #[inline]
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+// === Core Display and Conversion Traits ===
+
 impl std::fmt::Display for AppPath {
     #[inline]
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -31,73 +55,46 @@ impl AsRef<Path> for AppPath {
 impl From<&str> for AppPath {
     #[inline]
     fn from(path: &str) -> Self {
-        Self::new(path)
+        Self::with(path)
     }
 }
 
 impl From<String> for AppPath {
     #[inline]
     fn from(path: String) -> Self {
-        Self::new(path)
+        Self::with(path)
     }
 }
 
 impl From<&String> for AppPath {
     #[inline]
     fn from(path: &String) -> Self {
-        Self::new(path)
+        Self::with(path)
     }
 }
 
 impl From<&Path> for AppPath {
     #[inline]
     fn from(path: &Path) -> Self {
-        Self::new(path)
+        Self::with(path)
     }
 }
 
 impl From<PathBuf> for AppPath {
     #[inline]
     fn from(path: PathBuf) -> Self {
-        Self::new(path)
+        Self::with(path)
     }
 }
 
 impl From<&PathBuf> for AppPath {
     #[inline]
     fn from(path: &PathBuf) -> Self {
-        Self::new(path)
+        Self::with(path)
     }
 }
 
 // === Additional Trait Implementations ===
-
-impl Default for AppPath {
-    /// Creates an `AppPath` pointing to the executable's directory.
-    ///
-    /// This is equivalent to calling `AppPath::new("")`. The default instance
-    /// represents the directory containing the executable, which is useful as
-    /// a starting point for portable applications.
-    ///
-    /// # Examples
-    ///
-    /// ```rust
-    /// use app_path::AppPath;
-    ///
-    /// let exe_dir = AppPath::default();
-    /// let empty_path = AppPath::new("");
-    ///
-    /// // Default should be equivalent to new("")
-    /// assert_eq!(exe_dir, empty_path);
-    ///
-    /// // Both should point to the executable directory
-    /// assert_eq!(exe_dir.path(), app_path::exe_dir());
-    /// ```
-    #[inline]
-    fn default() -> Self {
-        Self::new("")
-    }
-}
 
 impl PartialEq for AppPath {
     /// Compares two `AppPath` instances for equality based on their resolved paths.
@@ -110,9 +107,9 @@ impl PartialEq for AppPath {
     /// ```rust
     /// use app_path::AppPath;
     ///
-    /// let path1 = AppPath::new("config.toml");
-    /// let path2 = AppPath::new("config.toml");
-    /// let path3 = AppPath::new("other.toml");
+    /// let path1 = AppPath::with("config.toml");
+    /// let path2 = AppPath::with("config.toml");
+    /// let path3 = AppPath::with("other.toml");
     ///
     /// assert_eq!(path1, path2);
     /// assert_ne!(path1, path3);
@@ -136,8 +133,8 @@ impl PartialOrd for AppPath {
     /// ```rust
     /// use app_path::AppPath;
     ///
-    /// let path1 = AppPath::new("a.txt");
-    /// let path2 = AppPath::new("b.txt");
+    /// let path1 = AppPath::with("a.txt");
+    /// let path2 = AppPath::with("b.txt");
     ///
     /// assert!(path1 < path2);
     /// ```
@@ -160,9 +157,9 @@ impl Ord for AppPath {
     /// use std::collections::BTreeSet;
     ///
     /// let mut paths = BTreeSet::new();
-    /// paths.insert(AppPath::new("config.toml"));
-    /// paths.insert(AppPath::new("data.db"));
-    /// paths.insert(AppPath::new("app.log"));
+    /// paths.insert(AppPath::with("config.toml"));
+    /// paths.insert(AppPath::with("data.db"));
+    /// paths.insert(AppPath::with("app.log"));
     ///
     /// // Paths are automatically sorted lexicographically
     /// let sorted: Vec<_> = paths.into_iter().collect();
@@ -187,7 +184,7 @@ impl Hash for AppPath {
     /// use std::collections::HashMap;
     ///
     /// let mut config_map = HashMap::new();
-    /// let config_path = AppPath::new("config.toml");
+    /// let config_path = AppPath::with("config.toml");
     /// config_map.insert(config_path, "Configuration file");
     /// ```
     #[inline]
@@ -210,7 +207,7 @@ impl Deref for AppPath {
     /// ```rust
     /// use app_path::AppPath;
     ///
-    /// let app_path = AppPath::new("config.toml");
+    /// let app_path = AppPath::with("config.toml");
     ///
     /// // Direct access to Path methods through deref
     /// assert_eq!(app_path.extension(), Some("toml".as_ref()));
@@ -247,7 +244,7 @@ impl Borrow<Path> for AppPath {
     /// use std::path::Path;
     ///
     /// let mut path_map = HashMap::new();
-    /// let app_path = AppPath::new("config.toml");
+    /// let app_path = AppPath::with("config.toml");
     /// path_map.insert(app_path, "config data");
     ///
     /// // Can look up using a &Path
@@ -273,7 +270,7 @@ impl AsRef<std::ffi::OsStr> for AppPath {
     /// use app_path::AppPath;
     /// use std::ffi::OsStr;
     ///
-    /// let config = AppPath::new("config.toml");
+    /// let config = AppPath::with("config.toml");
     /// let os_str: &OsStr = config.as_ref();
     /// ```
     #[inline]
@@ -294,7 +291,7 @@ impl From<AppPath> for PathBuf {
     /// use app_path::AppPath;
     /// use std::path::PathBuf;
     ///
-    /// let config = AppPath::new("config.toml");
+    /// let config = AppPath::with("config.toml");
     /// let path_buf: PathBuf = config.into();
     /// ```
     #[inline]
@@ -312,7 +309,7 @@ impl From<AppPath> for std::ffi::OsString {
     /// use app_path::AppPath;
     /// use std::ffi::OsString;
     ///
-    /// let config = AppPath::new("config.toml");
+    /// let config = AppPath::with("config.toml");
     /// let os_string: OsString = config.into();
     /// ```
     #[inline]

@@ -18,25 +18,52 @@ use std::path::PathBuf;
 ///
 /// ## API Overview
 ///
-/// - [`Self::new()`] - **Primary API**: Simple, infallible construction
-/// - [`Self::try_new()`] - **Libraries**: Fallible version for error handling  
+/// ### Constructors
+///
+/// - [`Self::new()`] - **Application base directory**: Returns the directory containing the executable
+/// - [`Self::with()`] - **Primary API**: Create paths relative to application base directory
+/// - [`Self::try_new()`] - **Libraries**: Fallible version for getting application base directory
+/// - [`Self::try_with()`] - **Libraries**: Fallible version for creating relative paths
 /// - [`Self::with_override()`] - **Deployment**: Environment-configurable paths
-/// - [`Self::path()`] - **Access**: Get the resolved `&Path` (deprecated - use `&app_path` or `as_ref()`)
+/// - [`Self::try_with_override()`] - **Deployment (Fallible)**: Fallible environment-configurable paths
+/// - [`Self::with_override_fn()`] - **Advanced**: Function-based override logic
+/// - [`Self::try_with_override_fn()`] - **Advanced (Fallible)**: Fallible function-based override logic
+///
+/// ### Directory Creation
+///
+/// - [`Self::create_parents()`] - **Files**: Creates parent directories for files
+/// - [`Self::create_dir()`] - **Directories**: Creates directories (and parents)
+///
+/// ### Path Operations & Traits
+///
 /// - **All `Path` methods**: Available directly via `Deref<Target=Path>` (e.g., `exists()`, `is_file()`, `file_name()`, `extension()`)
+/// - [`Self::into_path_buf()`] - **Conversion**: Extract owned `PathBuf` from wrapper
+/// - [`Self::into_inner()`] - **Conversion**: Alias for `into_path_buf()` following Rust patterns
+/// - [`Self::to_bytes()`] - **Ecosystem**: Raw bytes for specialized libraries
+/// - [`Self::into_bytes()`] - **Ecosystem**: Owned bytes for specialized libraries
 ///
 /// # Panics
 ///
-/// Methods panic if executable location cannot be determined (extremely rare).
-/// After first successful call, methods never panic (uses cached result).
+/// Constructor methods panic if the executable location cannot be determined (an
+/// extremely rare condition). After the first successful call, these methods
+/// never panic because the result is cached.
 ///
 /// # Examples
 ///
 /// ```rust
 /// use app_path::AppPath;
 ///
-/// // Basic usage - most common pattern
-/// let config = AppPath::new("config.toml");
-/// let data = AppPath::new("data/users.db");
+/// // Get the executable directory itself
+/// let exe_dir = AppPath::new();
+/// let exe_dir = AppPath::default(); // Same thing
+///
+/// // Create paths relative to executable
+/// let config = AppPath::with("config.toml");
+/// let data = AppPath::with("data/users.db");
+///
+/// // Chainable with join (since AppPath implements all Path methods)
+/// let log_file = AppPath::new().join("logs").join("app.log");
+/// let nested = AppPath::with("data").join("cache").join("temp.txt");
 ///
 /// // Works like standard paths - all Path methods available
 /// if config.exists() {
@@ -45,8 +72,8 @@ use std::path::PathBuf;
 /// data.create_parents(); // Creates data/ directory for the file
 ///
 /// // Mixed portable and system paths
-/// let portable = AppPath::new("app.conf");           // → exe_dir/app.conf
-/// let system = AppPath::new("/var/log/app.log");     // → /var/log/app.log
+/// let portable = AppPath::with("app.conf");           // → exe_dir/app.conf
+/// let system = AppPath::with("/var/log/app.log");     // → /var/log/app.log
 ///
 /// // Override for deployment flexibility
 /// let config = AppPath::with_override(
@@ -60,7 +87,6 @@ pub struct AppPath {
 }
 
 mod constructors;
-mod deprecated;
 mod directory;
 mod path_ops;
 mod traits;

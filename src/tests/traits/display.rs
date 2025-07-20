@@ -4,7 +4,7 @@ use crate::AppPath;
 
 #[test]
 fn test_display_trait() {
-    let app_path = AppPath::new("config.toml");
+    let app_path = AppPath::with("config.toml");
     let displayed = format!("{app_path}");
     assert!(displayed.ends_with("config.toml"));
 
@@ -14,7 +14,7 @@ fn test_display_trait() {
 
 #[test]
 fn test_display_with_complex_path() {
-    let complex_path = AppPath::new("data/nested/config/app.json");
+    let complex_path = AppPath::with("data/nested/config/app.json");
     let displayed = format!("{complex_path}");
     assert!(displayed.contains("app.json"));
     assert!(displayed.contains("config"));
@@ -25,7 +25,7 @@ fn test_display_with_complex_path() {
 
 #[test]
 fn test_debug_trait() {
-    let app_path = AppPath::new("config.toml");
+    let app_path = AppPath::with("config.toml");
     let debug_str = format!("{app_path:?}");
 
     // Debug output should contain useful information
@@ -36,7 +36,7 @@ fn test_debug_trait() {
 
 #[test]
 fn test_debug_trait_detailed() {
-    let app_path = AppPath::new("test.toml");
+    let app_path = AppPath::with("test.toml");
     let debug_output = format!("{app_path:#?}");
 
     // Pretty debug should be well-formatted

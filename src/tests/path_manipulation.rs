@@ -1,4 +1,4 @@
-use crate::{app_path, exe_dir, AppPath};
+use crate::{app_path, AppPath};
 use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
 
@@ -52,7 +52,10 @@ fn test_parent() {
     let root_file = app_path!("app.toml");
     let parent_of_root = root_file.parent().unwrap();
     // Parent should be the exe directory
-    assert_eq!(parent_of_root.path(), exe_dir());
+    assert_eq!(
+        parent_of_root.path(),
+        std::env::current_exe().unwrap().parent().unwrap()
+    );
 }
 
 // === Path Joining and Manipulation ===
@@ -74,7 +77,7 @@ fn test_join() {
 #[test]
 fn test_with_file_name() {
     let original = app_path!("config.toml");
-    let renamed = AppPath::new(original.with_file_name("settings.toml"));
+    let renamed = AppPath::with(original.with_file_name("settings.toml"));
     assert!(renamed.ends_with("settings.toml"));
     assert!(!renamed.ends_with("config.toml"));
 
@@ -98,7 +101,8 @@ fn test_with_extension() {
 
 #[test]
 fn test_starts_with() {
-    let exe_path = exe_dir();
+    let exe_exe = std::env::current_exe().unwrap();
+    let exe_path = exe_exe.parent().unwrap();
     let config_path = app_path!("config.toml");
 
     // App paths should start with the exe directory
@@ -122,7 +126,8 @@ fn test_ends_with() {
 
 #[test]
 fn test_strip_prefix() {
-    let exe_path = exe_dir();
+    let exe_exe = std::env::current_exe().unwrap();
+    let exe_path = exe_exe.parent().unwrap();
     let config_path = app_path!("config/app.toml");
 
     let relative = config_path.strip_prefix(exe_path).unwrap();
@@ -184,7 +189,7 @@ fn test_ancestors() {
 
     // Should include the path itself and all parent directories
     assert!(ancestors.len() > 3);
-    assert_eq!(ancestors[0], nested_path.path());
+    assert_eq!(ancestors[0], &*nested_path);
     assert!(ancestors[1].ends_with("nested"));
     assert!(ancestors[2].ends_with("deep"));
     assert!(ancestors[3].ends_with("config"));
@@ -203,7 +208,7 @@ fn test_to_string_lossy() {
 fn test_to_path_buf() {
     let app_path = app_path!("config.toml");
     let path_buf: PathBuf = app_path.to_path_buf();
-    assert_eq!(app_path.path(), path_buf.as_path());
+    assert_eq!(&*app_path, path_buf.as_path());
 }
 
 #[test]
@@ -226,7 +231,7 @@ fn test_complex_path_building() {
         backup_file.ends_with("data/config/settings.backup")
             || backup_file.ends_with("data\\config\\settings.backup")
     );
-    assert!(backup_file.starts_with(exe_dir()));
+    assert!(backup_file.starts_with(std::env::current_exe().unwrap().parent().unwrap()));
 }
 
 #[test]
@@ -285,14 +290,17 @@ fn test_root_file_manipulation() {
 
     // Should be able to get parent (exe directory)
     let parent = root_file.parent().unwrap();
-    assert_eq!(parent.path(), exe_dir());
+    assert_eq!(
+        parent.path(),
+        std::env::current_exe().unwrap().parent().unwrap()
+    );
 
     // Should be able to change extension
     let json_version = root_file.with_extension("json");
     assert!(json_version.ends_with("app.json"));
 
     // Should be able to rename
-    let renamed = AppPath::new(root_file.with_file_name("settings.toml"));
+    let renamed = AppPath::with(root_file.with_file_name("settings.toml"));
     assert!(renamed.ends_with("settings.toml"));
     assert_eq!(renamed.parent(), root_file.parent());
 }
@@ -313,9 +321,357 @@ fn test_path_comparison() {
     let path2 = app_path!("config.toml");
     let path3 = app_path!("settings.toml");
 
-    assert_eq!(path1.path(), path2.path());
-    assert_ne!(path1.path(), path3.path());
+    assert_eq!(&*path1, &*path2);
+    assert_ne!(&*path1, &*path3);
 
     // Test lexicographic ordering
-    assert!(path1.path() < path3.path()); // "config" < "settings"
+    assert!(*path1 < *path3); // "config" < "settings"
+}
+
+// === into_inner() Method Tests ===
+
+#[test]
+fn test_into_inner_basic() {
+    let app_path = app_path!("config.toml");
+    let expected_path = app_path.to_path_buf();
+
+    let inner_path: PathBuf = app_path.into_inner();
+
+    assert_eq!(inner_path, expected_path);
+    assert!(inner_path.is_absolute());
+    assert!(inner_path.ends_with("config.toml"));
+}
+
+#[test]
+fn test_into_path_buf_equivalence() {
+    let app_path1 = app_path!("config.toml");
+    let app_path2 = app_path!("config.toml");
+
+    // Both methods should return equivalent results
+    let via_into_inner = app_path1.into_inner();
+    let via_into_path_buf = app_path2.into_path_buf();
+
+    assert_eq!(via_into_inner, via_into_path_buf);
+    assert!(via_into_path_buf.is_absolute());
+    assert!(via_into_path_buf.ends_with("config.toml"));
+}
+
+#[test]
+fn test_into_inner_with_nested_path() {
+    let app_path = app_path!("config/settings/app.toml");
+    let expected_path = app_path.to_path_buf();
+
+    let inner_path: PathBuf = app_path.into_inner();
+
+    assert_eq!(inner_path, expected_path);
+    assert!(inner_path.is_absolute());
+    assert!(inner_path.ends_with("config/settings/app.toml"));
+}
+
+#[test]
+fn test_into_inner_with_directory_path() {
+    let app_path = app_path!("data/cache/");
+    let expected_path = app_path.to_path_buf();
+
+    let inner_path: PathBuf = app_path.into_inner();
+
+    assert_eq!(inner_path, expected_path);
+    assert!(inner_path.is_absolute());
+    assert!(inner_path.ends_with("data/cache"));
+}
+
+#[test]
+fn test_into_inner_type_consistency() {
+    let app_path = app_path!("test.txt");
+
+    // Verify the returned type is exactly PathBuf
+    let inner: PathBuf = app_path.into_inner();
+
+    // Should be able to use all PathBuf methods
+    let _display = inner.display();
+    let _components: Vec<_> = inner.components().collect();
+    let _extension = inner.extension();
+    let _file_name = inner.file_name();
+
+    // Should be convertible to standard path types
+    let _path_ref: &Path = inner.as_path();
+    let _os_str = inner.as_os_str();
+}
+
+#[test]
+fn test_into_inner_ownership_transfer() {
+    let app_path = app_path!("owned.txt");
+    let original_path = app_path.to_path_buf();
+
+    // Move ownership with into_inner
+    let inner_path = app_path.into_inner();
+
+    // Verify the path is the same
+    assert_eq!(inner_path, original_path);
+
+    // app_path is now consumed and cannot be used
+    // This test verifies that we truly get ownership of the inner PathBuf
+    drop(inner_path); // Explicit drop to show ownership
+}
+
+#[test]
+fn test_into_inner_with_special_characters() {
+    let app_path = app_path!("files with spaces/üñíçøðé.txt");
+    let expected_path = app_path.to_path_buf();
+
+    let inner_path: PathBuf = app_path.into_inner();
+
+    assert_eq!(inner_path, expected_path);
+    assert!(inner_path.is_absolute());
+    assert!(inner_path.to_string_lossy().contains("üñíçøðé.txt"));
+}
+
+#[test]
+fn test_into_inner_with_override() {
+    // Test case 1: Override with a custom path (completely replaces default)
+    let custom_path = std::env::temp_dir().join("custom_config.toml");
+    let app_path = AppPath::with_override("config.toml", Some(&custom_path));
+    let inner_path: PathBuf = app_path.into_inner();
+
+    // When override is Some, it completely replaces the default path
+    assert_eq!(inner_path, custom_path);
+    assert!(inner_path.is_absolute());
+    assert!(inner_path.ends_with("custom_config.toml"));
+
+    // Test case 2: No override, should use default relative to exe_dir
+    let app_path_default = AppPath::with_override("config.toml", None::<&str>);
+    let inner_path_default: PathBuf = app_path_default.into_inner();
+    let expected_default = std::env::current_exe()
+        .unwrap()
+        .parent()
+        .unwrap()
+        .join("config.toml");
+
+    assert_eq!(inner_path_default, expected_default);
+    assert!(inner_path_default.ends_with("config.toml"));
+}
+
+// === Byte Conversion Tests ===
+
+#[test]
+fn test_to_bytes_basic() {
+    let path = app_path!("config.toml");
+    let bytes = path.to_bytes();
+
+    // Basic byte functionality
+    assert!(!bytes.is_empty());
+    assert!(!bytes.is_empty());
+
+    // Should be able to get bytes multiple times
+    let bytes2 = path.to_bytes();
+    assert_eq!(bytes, bytes2);
+}
+
+#[test]
+fn test_to_bytes_returns_vec() {
+    let path = app_path!("test.txt");
+    let bytes = path.to_bytes();
+
+    // Should return Vec<u8>
+    let _vec: Vec<u8> = bytes.clone();
+
+    // Should be able to iterate over bytes
+    let byte_count = bytes.len();
+    assert_eq!(byte_count, bytes.len());
+}
+
+#[test]
+fn test_to_bytes_with_unicode() {
+    let path = app_path!("配置.toml");
+    let bytes = path.to_bytes();
+
+    // Unicode paths should produce valid bytes
+    assert!(!bytes.is_empty());
+
+    // Bytes should be different from ASCII-only path
+    let ascii_path = app_path!("config.toml");
+    let ascii_bytes = ascii_path.to_bytes();
+    assert_ne!(bytes, ascii_bytes);
+}
+
+#[test]
+fn test_to_bytes_with_special_chars() {
+    let path = app_path!("config with spaces.toml");
+    let bytes = path.to_bytes();
+
+    // Special characters should be encoded in bytes
+    assert!(!bytes.is_empty());
+
+    // Different from path without spaces
+    let no_spaces = app_path!("config.toml");
+    assert_ne!(bytes, no_spaces.to_bytes());
+}
+
+#[test]
+fn test_into_bytes_basic() {
+    let path = app_path!("config.toml");
+    let original_bytes = path.to_bytes().to_vec();
+
+    // Recreate path since into_bytes consumes it
+    let path2 = app_path!("config.toml");
+    let owned_bytes = path2.into_bytes();
+
+    // Should return Vec<u8> with same content
+    assert_eq!(owned_bytes, original_bytes);
+    assert!(!owned_bytes.is_empty());
+}
+
+#[test]
+fn test_into_bytes_returns_vec() {
+    let path = app_path!("test.txt");
+    let owned_bytes = path.into_bytes();
+
+    // Should return Vec<u8>
+    let _vec: Vec<u8> = owned_bytes.clone();
+
+    // Should be able to use Vec methods
+    assert!(owned_bytes.capacity() >= owned_bytes.len());
+    let mut mutable_bytes = owned_bytes;
+    mutable_bytes.push(0); // Should be able to mutate
+    assert!(!mutable_bytes.is_empty());
+}
+
+#[test]
+fn test_into_bytes_ownership() {
+    let path = app_path!("config.toml");
+    let owned_bytes = path.into_bytes();
+
+    // Should be able to move the bytes
+    let moved_bytes = owned_bytes;
+    assert!(!moved_bytes.is_empty());
+
+    // Should be able to pass to functions expecting Vec<u8>
+    fn takes_owned_bytes(bytes: Vec<u8>) -> usize {
+        bytes.len()
+    }
+    let len = takes_owned_bytes(moved_bytes);
+    assert!(len > 0);
+}
+
+#[test]
+fn test_bytes_consistency_between_methods() {
+    let path1 = app_path!("consistency_test.toml");
+    let path2 = app_path!("consistency_test.toml");
+
+    // Get bytes from first path (now returns Vec<u8>)
+    let first_bytes = path1.to_bytes();
+
+    // Get owned bytes from second path
+    let owned_bytes = path2.into_bytes();
+
+    // Should contain identical data
+    assert_eq!(first_bytes, owned_bytes);
+}
+
+#[test]
+fn test_bytes_different_paths_different_bytes() {
+    let path1 = app_path!("file1.txt");
+    let path2 = app_path!("file2.txt");
+
+    let bytes1 = path1.to_bytes();
+    let bytes2 = path2.to_bytes();
+
+    // Different paths should produce different bytes
+    assert_ne!(bytes1, bytes2);
+}
+
+#[test]
+fn test_bytes_same_path_same_bytes() {
+    let path1 = app_path!("same.txt");
+    let path2 = app_path!("same.txt");
+
+    let bytes1 = path1.to_bytes();
+    let bytes2 = path2.to_bytes();
+
+    // Same logical path should produce same bytes
+    assert_eq!(bytes1, bytes2);
+}
+
+#[test]
+fn test_bytes_with_path_operations() {
+    let base = app_path!("config");
+    let joined = base.join("app.toml");
+
+    let base_bytes = base.to_bytes();
+    let joined_bytes = joined.to_bytes();
+
+    // Joined path bytes should be different and longer
+    assert_ne!(base_bytes, joined_bytes);
+    assert!(joined_bytes.len() > base_bytes.len());
+}
+
+#[test]
+fn test_bytes_with_extension_changes() {
+    let original = app_path!("config.toml");
+    let with_json = original.with_extension("json");
+
+    let original_bytes = original.to_bytes();
+    let json_bytes = with_json.to_bytes();
+
+    // Extension change should result in different bytes
+    assert_ne!(original_bytes, json_bytes);
+}
+
+#[test]
+fn test_bytes_empty_scenarios() {
+    // Test with minimal path
+    let minimal = app_path!("a");
+    let bytes = minimal.to_bytes();
+    assert!(!bytes.is_empty());
+
+    // Even minimal paths should have some byte representation
+    assert!(!bytes.is_empty());
+}
+
+#[test]
+fn test_bytes_platform_encoding() {
+    let path = app_path!("test.txt");
+    let bytes = path.to_bytes();
+
+    // Bytes should be valid platform-specific encoding
+    assert!(!bytes.is_empty());
+
+    // Should be consistent across multiple calls
+    let bytes2 = path.to_bytes();
+    assert_eq!(bytes, bytes2);
+
+    // Length should be reasonable (not zero, not excessive)
+    assert!(!bytes.is_empty());
+    assert!(bytes.len() < 10000); // Reasonable upper bound for most paths
+}
+
+#[test]
+fn test_bytes_cross_platform_compatibility() {
+    // This test ensures our byte conversion methods use only stable Rust APIs
+    // and work correctly across all platforms supported by GitHub Actions
+    let path = app_path!("test-file.txt");
+
+    // Test to_bytes() returns Vec<u8>
+    let bytes = path.to_bytes();
+    let _vec_check: Vec<u8> = bytes.clone(); // Verify return type
+    assert!(!bytes.is_empty());
+
+    // Test into_bytes() returns Vec<u8> and consumes the path
+    let path2 = app_path!("test-file.txt");
+    let owned_bytes = path2.into_bytes();
+    let _vec_check2: Vec<u8> = owned_bytes.clone(); // Verify return type
+    assert!(!owned_bytes.is_empty());
+
+    // Both methods should produce identical results
+    assert_eq!(bytes, owned_bytes);
+
+    // Test with platform-specific path separators and special characters
+    let complex_path = app_path!("földer/subfōlder/file-名前.txt");
+    let complex_bytes = complex_path.to_bytes();
+    assert!(!complex_bytes.is_empty());
+
+    // Verify bytes are deterministic (same path = same bytes)
+    let path3 = app_path!("földer/subfōlder/file-名前.txt");
+    let bytes3 = path3.to_bytes();
+    assert_eq!(complex_bytes, bytes3);
 }

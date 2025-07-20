@@ -97,7 +97,7 @@ fn test_error_from_io_error_with_path() {
 
 #[test]
 fn test_works_with_std_functions() {
-    let app_path = AppPath::new("test.toml");
+    let app_path = AppPath::with("test.toml");
 
     // Should work with functions expecting AsRef<Path>
     let metadata_result = std::fs::metadata(&app_path);
@@ -112,9 +112,9 @@ fn test_works_with_std_functions() {
 #[test]
 fn test_collection_operations() {
     let paths = [
-        AppPath::new("a.toml"),
-        AppPath::new("b.toml"),
-        AppPath::new("c.toml"),
+        AppPath::with("a.toml"),
+        AppPath::with("b.toml"),
+        AppPath::with("c.toml"),
     ];
 
     // Should work with iterators
@@ -126,7 +126,7 @@ fn test_collection_operations() {
 
 #[test]
 fn test_borrow_checker_friendly() {
-    let app_path = AppPath::new("config.toml");
+    let app_path = AppPath::with("config.toml");
 
     // Should be able to borrow and move without issues
     let borrowed_ref = &app_path;

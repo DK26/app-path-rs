@@ -5,16 +5,16 @@ use std::sync::Arc;
 
 #[test]
 fn test_clone_trait() {
-    let original = AppPath::new("config.toml");
+    let original = AppPath::with("config.toml");
     let cloned = original.clone();
 
-    assert_eq!(original.path(), cloned.path());
-    assert!(cloned.path().ends_with("config.toml"));
+    assert_eq!(&*original, &*cloned);
+    assert!(cloned.ends_with("config.toml"));
 }
 
 #[test]
 fn test_clone_independence() {
-    let original = AppPath::new("original.toml");
+    let original = AppPath::with("original.toml");
     let cloned = original.clone();
 
     // Changes to the path should not affect the clone
@@ -31,7 +31,7 @@ fn test_send_trait() {
     assert_send::<AppPath>();
 
     // Should be able to send across threads
-    let path = AppPath::new("config.toml");
+    let path = AppPath::with("config.toml");
     let handle = std::thread::spawn(move || format!("{path}"));
 
     let result = handle.join().unwrap();
@@ -44,7 +44,7 @@ fn test_sync_trait() {
     assert_sync::<AppPath>();
 
     // Should be able to share across threads
-    let path = Arc::new(AppPath::new("shared.toml"));
+    let path = Arc::new(AppPath::with("shared.toml"));
     let path_clone: Arc<AppPath> = Arc::clone(&path);
 
     let handle = std::thread::spawn(move || {
@@ -60,7 +60,7 @@ fn test_sync_trait() {
 
 #[test]
 fn test_deref_to_path() {
-    let app_path = AppPath::new("config.toml");
+    let app_path = AppPath::with("config.toml");
 
     // Should be able to call Path methods directly
     assert!(app_path.ends_with("config.toml"));
@@ -70,7 +70,7 @@ fn test_deref_to_path() {
 
 #[test]
 fn test_deref_path_methods() {
-    let nested_path = AppPath::new("config/deep/app.toml");
+    let nested_path = AppPath::with("config/deep/app.toml");
 
     // All Path methods should be available
     assert!(nested_path.is_absolute());

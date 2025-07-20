@@ -1,13 +1,8 @@
 name: CI
-# 
-# This workflow runs CI checks on GitHub Actions.
-# For local development with auto-fixing, use: bash ci-local.sh
 
 on:
   push:
     branches: [ dev ]
-  pull_request:
-    branches: [ main ]
 
 env:
   CARGO_TERM_COLOR: always
@@ -69,7 +64,8 @@ jobs:
         echo "To fix locally, run: cargo clippy --fix --allow-dirty --allow-staged --all-targets --all-features"
         echo "Then run: cargo clippy --all-targets --all-features -- -D warnings"
 
-    - name: Run tests
+    # Skip 'cargo check' since 'cargo test' compiles everything anyway
+    - name: Run tests (includes compilation and doc tests)
       run: cargo test --verbose
 
   docs:

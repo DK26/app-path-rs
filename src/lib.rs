@@ -37,28 +37,48 @@
 //!
 //! ## API Design
 //!
-//! - [`AppPath::new()`] - **Recommended**: Simple constructor (panics on failure)
-//! - [`AppPath::try_new()`] - **Libraries**: Fallible version for error handling
+//! ### Constructors
+//!
+//! - [`AppPath::new()`] - **Application base directory**: Returns the directory containing the executable
+//! - [`AppPath::with()`] - **Primary API**: Create paths relative to application base directory
+//! - [`AppPath::try_new()`] - **Libraries**: Fallible version for getting application base directory
+//! - [`AppPath::try_with()`] - **Libraries**: Fallible version for creating relative paths
 //! - [`AppPath::with_override()`] - **Deployment**: Environment-configurable paths
+//! - [`AppPath::try_with_override()`] - **Deployment (Fallible)**: Fallible environment-configurable paths
 //! - [`AppPath::with_override_fn()`] - **Advanced**: Function-based override logic
-//! - [`app_path!`] - **Macro**: Convenient syntax with optional environment overrides
-//! - [`try_app_path!`] - **Macro (Fallible)**: Returns `Result` for explicit error handling
+//! - [`AppPath::try_with_override_fn()`] - **Advanced (Fallible)**: Fallible function-based override logic
+//!
+//! ### Directory Creation
+//!
 //! - [`AppPath::create_parents()`] - **Files**: Creates parent directories for files
 //! - [`AppPath::create_dir()`] - **Directories**: Creates directories (and parents)
-//! - [`exe_dir()`] - **Advanced**: Direct access to executable directory (panics on failure)
-//! - [`try_exe_dir()`] - **Libraries**: Fallible executable directory access
 //!
-//! ## Function Variants
+//! ### Path Operations & Traits
+//!
+//! - **All `Path` methods**: Available directly via `Deref<Target=Path>` (e.g., `exists()`, `is_file()`, `file_name()`, `extension()`)
+//! - [`AppPath::into_path_buf()`] - **Conversion**: Extract owned `PathBuf` from wrapper
+//! - [`AppPath::into_inner()`] - **Conversion**: Alias for `into_path_buf()` following Rust patterns
+//! - [`AppPath::to_bytes()`] - **Ecosystem**: Raw bytes for specialized libraries
+//! - [`AppPath::into_bytes()`] - **Ecosystem**: Owned bytes for specialized libraries
+//!
+//! ### Convenience Macros
+//!
+//! - [`app_path!`] - **Macro**: Convenient syntax with optional environment overrides
+//! - [`try_app_path!`] - **Macro (Fallible)**: Returns `Result` for explicit error handling
+//!
+//! ## Constructor Variants
 //!
 //! This crate provides both panicking and fallible variants for most operations:
 //!
 //! | Panicking (Recommended) | Fallible (Libraries) | Use Case |
 //! |------------------------|---------------------|----------|
-//! | [`AppPath::new()`] | [`AppPath::try_new()`] | Constructor methods |
+//! | [`AppPath::new()`] | [`AppPath::try_new()`] | Get application base directory |
+//! | [`AppPath::with()`] | [`AppPath::try_with()`] | Create relative paths |
+//! | [`AppPath::with_override()`] | [`AppPath::try_with_override()`] | Environment-configurable paths |
+//! | [`AppPath::with_override_fn()`] | [`AppPath::try_with_override_fn()`] | Function-based override logic |
 //! | [`app_path!`] | [`try_app_path!`] | Convenient macros |
-//! | [`exe_dir()`] | [`try_exe_dir()`] | Direct directory access |
 //!
-//! ### Macro Syntax Variants
+//! ## Macro Syntax Variants
 //!
 //! Both `app_path!` and `try_app_path!` macros support four syntax forms for maximum flexibility:
 //!
@@ -83,27 +103,69 @@
 //! // → Uses function result if Some, otherwise /path/to/exe/config.toml
 //! ```
 //!
-//! ### Variable Capturing
+//! ### Variable Capturing in Macros
 //!
 //! Both macros support variable capturing in complex expressions:
 //!
 //! ```rust
-//! # use app_path::{app_path, try_app_path};
+//! # use app_path::app_path;
 //! let version = "1.0";
-//! let cache = app_path!(format!("cache-{version}")); // Captures `version`
-//! // → /path/to/exe/cache-1.0
+//! let cache = app_path!(format!("cache-{version}"));
 //!
-//! // Useful in closures and async blocks
-//! async fn process_data(id: u32) {
-//!     let output = app_path!(format!("output-{id}.json")); // Captures `id`
-//!     // → /path/to/exe/output-123.json (where id = 123)
-//!     // ... async processing
-//! }
+//! let user_ids = vec![123, 456];
+//! let logs: Vec<_> = user_ids.iter()
+//!     .map(|id| app_path!(format!("logs/user-{id}.log")))
+//!     .collect();
 //! ```
 //!
-//! ### Panic Conditions
+//! ## Ecosystem Integration
 //!
-//! [`AppPath::new()`] and [`exe_dir()`] panic only if executable location cannot be determined:
+//! AppPath works seamlessly with ecosystem crates through `Deref<Target=Path>`:
+//!
+//! ### Serde Integration
+//!
+//! ```rust
+//! use app_path::app_path;
+//! use serde::{Serialize, Deserialize};
+//!
+//! #[derive(Serialize, Deserialize)]
+//! struct Config {
+//!     db_path: String,
+//! }
+//!
+//! let config = Config {
+//!     db_path: app_path!("data/app.db").display().to_string(),
+//! };
+//! # Ok::<(), Box<dyn std::error::Error>>(())
+//! ```
+//!
+//! ### UTF-8 Path Serialization (camino)
+//!
+//! ```rust
+//! use app_path::app_path;
+//! use camino::Utf8PathBuf;
+//!
+//! let static_dir = app_path!("web/static");
+//! let utf8_static = Utf8PathBuf::from_path_buf(static_dir.into_path_buf())
+//!     .map_err(|_| "Invalid UTF-8 path")?;
+//! # Ok::<(), Box<dyn std::error::Error>>(())
+//! ```
+//!
+//! ### Cross-Platform Path Types (typed-path)
+//!
+//! ```rust
+//! use app_path::app_path;
+//! use typed_path::{WindowsPath, UnixPath};
+//!
+//! let dist_dir = app_path!("dist");
+//! let win_path = WindowsPath::new(&dist_dir.to_bytes());
+//! let unix_path = UnixPath::new(&dist_dir.to_bytes());
+//! # Ok::<(), Box<dyn std::error::Error>>(())
+//! ```
+//!
+//! ## Panic Conditions
+//!
+//! [`AppPath::new()`] panics only if executable location cannot be determined:
 //! - `std::env::current_exe()` fails (extremely rare system failure)
 //! - Executable path is empty (indicates system corruption)
 //!
@@ -112,45 +174,7 @@
 //! calls never panic.
 //!
 //! **For libraries or applications requiring graceful error handling**, use the fallible
-//! variants [`AppPath::try_new()`] and [`try_exe_dir()`] instead.
-//!
-//! ## Ecosystem Integration
-//!
-//! `app-path` integrates seamlessly with popular Rust path crates through standard trait implementations:
-//!
-//! ### UTF-8 Path Serialization (camino)
-//!
-//! ```rust
-//! use app_path::app_path;
-//! # // Conditional compilation for documentation without dependencies
-//! # /*
-//! use camino::Utf8PathBuf;
-//!
-//! let static_dir = app_path!("web/static", env = "STATIC_DIR");
-//! let utf8_static = Utf8PathBuf::try_from(static_dir)?; // Direct conversion
-//!
-//! // Safe JSON serialization with UTF-8 guarantees
-//! let config = serde_json::json!({ "static_files": utf8_static });
-//! # */
-//! # Ok::<(), Box<dyn std::error::Error>>(())
-//! ```
-//!
-//! ### Cross-Platform Path Types (typed-path)
-//!
-//! ```rust
-//! use app_path::app_path;
-//! # // Conditional compilation for documentation without dependencies
-//! # /*
-//! use typed_path::{WindowsPath, UnixPath};
-//!
-//! let dist_dir = app_path!("dist");
-//!
-//! // Platform-specific paths with proper separators
-//! let win_path = WindowsPath::new(&dist_dir);  // Uses \ on Windows  
-//! let unix_path = UnixPath::new(&dist_dir);    // Uses / on Unix
-//! # */
-//! # Ok::<(), Box<dyn std::error::Error>>(())
-//! ```
+//! variant [`AppPath::try_new()`] instead.
 
 mod app_path;
 mod error;
@@ -162,46 +186,36 @@ mod tests;
 // Re-export the public API
 pub use app_path::AppPath;
 pub use error::AppPathError;
-pub use functions::{exe_dir, try_exe_dir};
+
+// Internal functions for tests and crate internals
+pub(crate) use functions::try_exe_dir;
 
 /// Convenience macro for creating `AppPath` instances with optional environment variable overrides.
 ///
-/// This macro provides a more ergonomic way to create `AppPath` instances, especially when
-/// dealing with environment variable overrides.
-///
 /// # Syntax
 ///
-/// - `app_path!(path)` - Simple path creation (equivalent to `AppPath::new(path)`)
+/// - `app_path!()` - Application base directory (equivalent to `AppPath::new()`)
+/// - `app_path!(path)` - Simple path creation (equivalent to `AppPath::with(path)`)
 /// - `app_path!(path, env = "VAR_NAME")` - With environment variable override
-/// - `app_path!(path, override = expression)` - With any optional override expression
+/// - `app_path!(path, override = expression)` - With optional override expression
 /// - `app_path!(path, fn = function)` - With function-based override logic
 ///
 /// # Examples
 ///
 /// ```rust
-/// use app_path::{app_path, AppPath};
+/// use app_path::app_path;
 ///
-/// // Simple usage
 /// let config = app_path!("config.toml");
-/// assert_eq!(config.file_name().unwrap(), "config.toml");
-///
-/// // Environment variable override
 /// let data_dir = app_path!("data", env = "DATA_DIR");
-///
-/// // Custom override expression
 /// let log_file = app_path!("app.log", override = std::env::args().nth(1));
-///
-/// // Function-based override
-/// let config_dir = app_path!("config", fn = || {
-///     std::env::var("XDG_CONFIG_HOME")
-///         .or_else(|_| std::env::var("HOME").map(|h| format!("{h}/.config")))
-///         .ok()
-/// });
 /// ```
 #[macro_export]
 macro_rules! app_path {
+    () => {
+        $crate::AppPath::new()
+    };
     ($path:expr) => {
-        $crate::AppPath::new($path)
+        $crate::AppPath::with($path)
     };
     ($path:expr, env = $env_var:expr) => {
         $crate::AppPath::with_override($path, ::std::env::var($env_var).ok())
@@ -222,7 +236,8 @@ macro_rules! app_path {
 ///
 /// # Syntax
 ///
-/// - `try_app_path!(path)` - Simple path creation (equivalent to `AppPath::try_new(path)`)
+/// - `try_app_path!()` - Application base directory (equivalent to `AppPath::try_new()`)
+/// - `try_app_path!(path)` - Simple path creation (equivalent to `AppPath::try_with(path)`)
 /// - `try_app_path!(path, env = "VAR_NAME")` - With environment variable override
 /// - `try_app_path!(path, override = expression)` - With any optional override expression
 /// - `try_app_path!(path, fn = function)` - With function-based override logic
@@ -232,19 +247,11 @@ macro_rules! app_path {
 /// ## Basic Usage
 ///
 /// ```rust
-/// use app_path::{try_app_path, AppPathError};
+/// use app_path::try_app_path;
 ///
-/// fn setup_config() -> Result<(), AppPathError> {
-///     let config = try_app_path!("config.toml")?;
-///     let database = try_app_path!("data/users.db")?;
-///     
-///     // Use paths normally
-///     if config.exists() {
-///         println!("Config found at: {}", config.display());
-///     }
-///     
-///     Ok(())
-/// }
+/// let config = try_app_path!("config.toml")?;
+/// let database = try_app_path!("data/users.db")?;
+/// # Ok::<(), Box<dyn std::error::Error>>(())
 /// ```
 ///
 /// ## Environment Variable Overrides
@@ -252,14 +259,9 @@ macro_rules! app_path {
 /// ```rust
 /// use app_path::try_app_path;
 ///
-/// fn setup_logging() -> Result<(), Box<dyn std::error::Error>> {
-///     // Uses "logs/app.log" by default, LOG_PATH env var if set
-///     let log_file = try_app_path!("logs/app.log", env = "LOG_PATH")?;
-///     log_file.create_parents()?;
-///     
-///     std::fs::write(&log_file, "Application started")?;
-///     Ok(())
-/// }
+/// let log_file = try_app_path!("logs/app.log", env = "LOG_PATH")?;
+/// log_file.create_parents()?;
+/// # Ok::<(), Box<dyn std::error::Error>>(())
 /// ```
 ///
 /// ## Custom Override Logic
@@ -267,17 +269,9 @@ macro_rules! app_path {
 /// ```rust
 /// use app_path::try_app_path;
 ///
-/// fn get_data_dir() -> Option<String> {
-///     std::env::var("XDG_DATA_HOME")
-///         .or_else(|_| std::env::var("HOME").map(|h| format!("{h}/.local/share")))
-///         .ok()
-/// }
-///
-/// fn setup_data() -> Result<(), Box<dyn std::error::Error>> {
-///     let data_dir = try_app_path!("data", override = get_data_dir())?;
-///     data_dir.create_dir()?;
-///     Ok(())
-/// }
+/// let custom_path = std::env::var("DATA_HOME").ok();
+/// let data_dir = try_app_path!("data", override = custom_path)?;
+/// # Ok::<(), Box<dyn std::error::Error>>(())
 /// ```
 ///
 /// ## Function-Based Override
@@ -285,53 +279,29 @@ macro_rules! app_path {
 /// ```rust
 /// use app_path::try_app_path;
 ///
-/// fn setup_cache() -> Result<(), Box<dyn std::error::Error>> {
-///     let cache_dir = try_app_path!("cache", fn = || {
-///         std::env::var("XDG_CACHE_HOME")
-///             .or_else(|_| std::env::var("HOME").map(|h| format!("{h}/.cache")))
-///             .ok()
-///     })?;
-///     cache_dir.create_dir()?;
-///     Ok(())
-/// }
+/// let cache_dir = try_app_path!("cache", fn = || std::env::var("CACHE_DIR").ok())?;
+/// # Ok::<(), Box<dyn std::error::Error>>(())
 /// ```
 ///
-/// ## Error Handling Patterns
+/// ## Error Handling
 ///
 /// ```rust
 /// use app_path::{try_app_path, AppPathError};
 ///
 /// match try_app_path!("config.toml") {
-///     Ok(config) => {
-///         println!("Config path: {}", config.display());
-///     }
-///     Err(AppPathError::ExecutableNotFound(msg)) => {
-///         eprintln!("Cannot determine executable location: {msg}");
-///     }
-///     Err(AppPathError::InvalidExecutablePath(msg)) => {
-///         eprintln!("Invalid executable path: {msg}");
-///     }
-///     Err(AppPathError::IoError(msg)) => {
-///         eprintln!("I/O operation failed: {msg}");
-///     }
+///     Ok(config) => println!("Config: {}", config.display()),
+///     Err(e) => eprintln!("Error: {e}"),
 /// }
 /// ```
 ///
 /// ## Library Usage
 ///
 /// ```rust
-/// use app_path::{try_app_path, AppPathError};
+/// use app_path::try_app_path;
 ///
-/// /// Library function that gracefully handles path errors
-/// pub fn load_user_config() -> Result<String, Box<dyn std::error::Error>> {
-///     let config_path = try_app_path!("config.toml", env = "USER_CONFIG")?;
-///         
-///     if !config_path.exists() {
-///         return Err("Config file not found".into());
-///     }
-///     
-///     let content = std::fs::read_to_string(&config_path)?;
-///     Ok(content)
+/// pub fn load_config() -> Result<String, Box<dyn std::error::Error>> {
+///     let config_path = try_app_path!("config.toml")?;
+///     std::fs::read_to_string(&config_path).map_err(Into::into)
 /// }
 /// ```
 ///
@@ -354,12 +324,15 @@ macro_rules! app_path {
 /// # See Also
 ///
 /// - [`app_path!`] - Panicking version with identical syntax
-/// - [`AppPath::try_new`] - Constructor equivalent
-/// - [`AppPath::try_with_override`] - Constructor with override equivalent
+/// - [`AppPath::try_new()`] - Constructor equivalent
+/// - [`AppPath::try_with_override()`] - Constructor with override equivalent
 #[macro_export]
 macro_rules! try_app_path {
+    () => {
+        $crate::AppPath::try_new()
+    };
     ($path:expr) => {
-        $crate::AppPath::try_new($path)
+        $crate::AppPath::try_with($path)
     };
     ($path:expr, env = $env_var:expr) => {
         $crate::AppPath::try_with_override($path, ::std::env::var($env_var).ok())

@@ -5,7 +5,7 @@ use std::path::{Path, PathBuf};
 
 #[test]
 fn test_as_ref_path() {
-    let app_path = AppPath::new("config.toml");
+    let app_path = AppPath::with("config.toml");
     let path_ref: &Path = app_path.as_ref();
     assert!(path_ref.ends_with("config.toml"));
 
@@ -24,7 +24,7 @@ fn test_as_ref_path() {
 
 #[test]
 fn test_as_ref_path_with_nested() {
-    let nested_path = AppPath::new("config/deep/app.toml");
+    let nested_path = AppPath::with("config/deep/app.toml");
     let path_ref: &Path = nested_path.as_ref();
     assert!(
         path_ref.ends_with("config/deep/app.toml") || path_ref.ends_with("config\\deep\\app.toml")
@@ -35,14 +35,14 @@ fn test_as_ref_path_with_nested() {
 
 #[test]
 fn test_into_pathbuf() {
-    let app_path = AppPath::new("config.toml");
+    let app_path = AppPath::with("config.toml");
     let path_buf: PathBuf = app_path.into();
     assert!(path_buf.ends_with("config.toml"));
 }
 
 #[test]
 fn test_into_pathbuf_complex() {
-    let complex_path = AppPath::new("data/config/settings.json");
+    let complex_path = AppPath::with("data/config/settings.json");
     let path_buf: PathBuf = complex_path.into();
     assert!(
         path_buf.ends_with("data/config/settings.json")
@@ -60,14 +60,14 @@ fn test_from_pathbuf() {
 
     // Note: From trait uses AppPath resolution, so path will be resolved relative to exe dir
     // Check that the resolved path ends with the original filename
-    assert!(app_path.path().ends_with("config.toml"));
+    assert!(app_path.ends_with("config.toml"));
 }
 
 #[test]
 fn test_from_str() {
     // AppPath doesn't implement FromStr trait, use new() instead
-    let app_path = AppPath::new("config.toml");
-    assert!(app_path.path().ends_with("config.toml"));
+    let app_path = AppPath::with("config.toml");
+    assert!(app_path.ends_with("config.toml"));
 }
 
 // === Borrow Trait Tests ===
@@ -76,7 +76,7 @@ fn test_from_str() {
 fn test_borrow_checker_friendly() {
     use std::borrow::Borrow;
 
-    let app_path = AppPath::new("config.toml");
+    let app_path = AppPath::with("config.toml");
     let borrowed: &Path = app_path.borrow();
     assert!(borrowed.ends_with("config.toml"));
 
@@ -86,7 +86,7 @@ fn test_borrow_checker_friendly() {
     map.insert(app_path, "config_value");
 
     // Should be able to lookup using a path
-    let lookup_path = AppPath::new("config.toml").to_path_buf();
+    let lookup_path = AppPath::with("config.toml").to_path_buf();
     let borrowed_lookup: &Path = &lookup_path;
     // This tests that Borrow is implemented correctly for lookups
     assert!(map.contains_key(borrowed_lookup));
@@ -97,9 +97,9 @@ fn test_borrow_checker_friendly() {
 #[test]
 fn test_collection_operations() {
     let paths = vec![
-        AppPath::new("a.txt"),
-        AppPath::new("b.txt"),
-        AppPath::new("c.txt"),
+        AppPath::with("a.txt"),
+        AppPath::with("b.txt"),
+        AppPath::with("c.txt"),
     ];
 
     // Should work with iterators and standard library functions
@@ -116,7 +116,7 @@ fn test_collection_operations() {
 
 #[test]
 fn test_works_with_std_functions() {
-    let app_path = AppPath::new("test_file.txt");
+    let app_path = AppPath::with("test_file.txt");
 
     // Should work with std::fs functions
     let _metadata_result = std::fs::metadata(&app_path); // Won't panic, just may return error
@@ -127,5 +127,5 @@ fn test_works_with_std_functions() {
 
     // Should work with path joining
     let joined = app_path.join("subfile.txt");
-    assert!(joined.path().to_string_lossy().contains("test_file.txt"));
+    assert!(joined.to_string_lossy().contains("test_file.txt"));
 }
