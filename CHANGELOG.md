@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.1] - 2025-07-21
+
+### 🧹 **Maintenance**
+
+- **Removed deprecated `.path()` method** - Completed deprecation cycle started in v0.2.7, method fully removed from codebase
+- **Updated tests** - Migrated all test code from deprecated `.path()` to modern deref patterns (`&app_path`)
+- **Improved documentation examples** - Corrected and clarified examples throughout the codebase
+
+### 📚 **Documentation**
+
+- **Enhanced code examples** - Better clarity and accuracy in documentation examples
+- **Test suite cleanup** - Ensured all tests use current API patterns without deprecated methods
+
 ## [1.0.0] - 2025-07-20
 
 ### 🎉 **STABLE RELEASE** - Production Ready API

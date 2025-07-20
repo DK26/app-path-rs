@@ -1,6 +1,6 @@
 [package]
 name = "app-path"
-version = "1.0.0"
+version = "1.0.1"
 edition = "2021"
 authors = ["David Krasnitsky <dikaveman@gmail.com>"]
 description = "Create file paths relative to your executable for truly portable applications"
