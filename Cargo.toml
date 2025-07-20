@@ -1,6 +1,6 @@
 [package]
 name = "app-path"
-version = "0.2.7"
+version = "1.0.0"
 edition = "2021"
 authors = ["David Krasnitsky <dikaveman@gmail.com>"]
 description = "Create file paths relative to your executable for truly portable applications"
@@ -9,7 +9,7 @@ repository = "https://github.com/DK26/app-path-rs"
 homepage = "https://github.com/DK26/app-path-rs"
 documentation = "https://docs.rs/app-path"
 readme = "README.md"
-keywords = ["filesystem", "portable", "paths", "executable", "cross-platform"]
+keywords = ["filesystem", "portable", "path", "executable", "cross-platform"]
 categories = ["filesystem", "development-tools"]
 
 [dependencies]

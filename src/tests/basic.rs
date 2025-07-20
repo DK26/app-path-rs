@@ -1,4 +1,4 @@
-use crate::{exe_dir, AppPath};
+use crate::AppPath;
 use std::env;
 use std::fs::{self, File};
 use std::io::Write;
@@ -15,46 +15,49 @@ pub fn create_test_file(path: &Path) {
 #[allow(dead_code)]
 /// Helper for expected executable-relative path
 pub fn expect_exe_rel(path: &str) -> PathBuf {
-    exe_dir().join(path)
+    std::env::current_exe()
+        .unwrap()
+        .parent()
+        .unwrap()
+        .join(path)
 }
 
 #[test]
 fn resolves_relative_path_to_exe_dir() {
     let rel = "config.toml";
-    let rel_path = AppPath::new(rel);
-    let expected = exe_dir().join(rel);
+    let rel_path = AppPath::with(rel);
+    let expected = std::env::current_exe().unwrap().parent().unwrap().join(rel);
 
     assert_eq!(&*rel_path, &expected);
     assert!(rel_path.is_absolute());
 }
 
 #[test]
-fn handles_absolute_path_input() {
-    let temp_dir = env::temp_dir().join("app_path_test_base");
-    let _ = fs::remove_dir_all(&temp_dir);
-    fs::create_dir_all(&temp_dir).unwrap();
-
+fn handles_pathbuf_input() {
     let rel = "subdir/file.txt";
-    let absolute_path = temp_dir.join(rel);
-    let app_path = AppPath::new(&absolute_path);
-    let expected = temp_dir.join(rel);
+    let rel_pathbuf = PathBuf::from(rel);
+    let app_path = AppPath::from(&rel_pathbuf);
+    let expected = std::env::current_exe().unwrap().parent().unwrap().join(rel);
 
-    assert_eq!(&*app_path, expected.as_path());
+    assert_eq!(&*app_path, &expected);
     assert!(app_path.is_absolute());
 }
 
 #[test]
-fn can_access_file_using_full_path() {
-    let temp_dir = env::temp_dir().join("app_path_test_access");
+fn can_access_file_using_relative_path() {
     let file_name = "access.txt";
-    let file_path = temp_dir.join(file_name);
-    let _ = fs::remove_dir_all(&temp_dir);
-    fs::create_dir_all(&temp_dir).unwrap();
+    // Create file in exe directory for testing
+    let exe_path = std::env::current_exe().unwrap();
+    let exe_dir = exe_path.parent().unwrap();
+    let file_path = exe_dir.join(file_name);
     create_test_file(&file_path);
 
-    let rel_path = AppPath::new(temp_dir.join(file_name));
+    let rel_path = AppPath::with(file_name);
     assert!(rel_path.exists());
     assert_eq!(&*rel_path, file_path.as_path());
+
+    // Cleanup
+    let _ = fs::remove_file(&file_path);
 }
 
 #[test]
@@ -64,8 +67,8 @@ fn handles_dot_and_dotdot_components() {
     fs::create_dir_all(&temp_dir).unwrap();
 
     let rel = "./foo/../bar.txt";
-    let rel_path = AppPath::new(temp_dir.join(rel));
-    let expected = temp_dir.join(rel);
+    let rel_path = AppPath::with(rel);
+    let expected = std::env::current_exe().unwrap().parent().unwrap().join(rel);
 
     assert_eq!(&*rel_path, expected.as_path());
 }
@@ -73,12 +76,12 @@ fn handles_dot_and_dotdot_components() {
 #[test]
 fn as_ref_and_into_conversions_are_consistent() {
     let rel = "somefile.txt";
-    let rel_path = AppPath::new(rel);
+    let rel_path = AppPath::with(rel);
     let into_pathbuf: PathBuf = rel_path.clone().into();
     assert_eq!(&*rel_path, into_pathbuf.as_path());
 
     // Test the new into_path_buf method
-    let rel_path2 = AppPath::new(rel);
+    let rel_path2 = AppPath::with(rel);
     let path_buf = rel_path2.into_path_buf();
     assert_eq!(&*rel_path, path_buf.as_path());
 }
@@ -86,14 +89,13 @@ fn as_ref_and_into_conversions_are_consistent() {
 #[test]
 fn test_deref_coercion_patterns() {
     let rel = "data/file.txt";
-    let temp_dir = env::temp_dir().join("app_path_test_full");
-    let rel_path = AppPath::new(temp_dir.join(rel));
-    let expected_path = temp_dir.join(rel);
+    let rel_path = AppPath::with(rel);
+    let expected = std::env::current_exe().unwrap().parent().unwrap().join(rel);
 
     // Demonstrating the improved patterns - use as_ref() or deref coercion
     let as_ref_path: &Path = rel_path.as_ref();
-    assert_eq!(as_ref_path, expected_path.as_path());
-    assert_eq!(&*rel_path, expected_path.as_path());
+    assert_eq!(as_ref_path, expected.as_path());
+    assert_eq!(&*rel_path, expected.as_path());
 }
 
 #[test]
@@ -106,10 +108,19 @@ fn test_exists_method() {
     let file_path = temp_dir.join(file_name);
     create_test_file(&file_path);
 
-    let rel_path = AppPath::new(temp_dir.join(file_name));
+    // Test exists() with a file we actually create
+    let test_file_name = "test_exists_file.txt";
+    let exe_dir = crate::try_exe_dir().unwrap();
+    let test_file_path = exe_dir.join(test_file_name);
+    std::fs::write(&test_file_path, "test content").unwrap();
+
+    let rel_path = AppPath::with(test_file_name);
     assert!(rel_path.exists());
 
-    let non_existent = AppPath::new(temp_dir.join("non_existent.txt"));
+    // Clean up
+    std::fs::remove_file(&test_file_path).ok();
+
+    let non_existent = AppPath::with("definitely_does_not_exist_123456.txt");
     assert!(!non_existent.exists());
 }
 
@@ -121,7 +132,7 @@ fn test_absolute_path_behavior() {
         "/tmp/config.toml"
     };
 
-    let app_path = AppPath::new(absolute_path);
+    let app_path = AppPath::with(absolute_path);
 
     // PathBuf::join() with absolute paths replaces the base path entirely
     assert_eq!(&*app_path, Path::new(absolute_path));
@@ -130,11 +141,12 @@ fn test_absolute_path_behavior() {
 
 #[test]
 fn test_exe_dir_function() {
-    let dir = exe_dir();
+    let exe_path = std::env::current_exe().unwrap();
+    let dir = exe_path.parent().unwrap();
     assert!(dir.is_absolute());
 
     // Should be consistent with AppPath behavior
-    let config = AppPath::new("test.txt");
+    let config = AppPath::with("test.txt");
     let expected = dir.join("test.txt");
     assert_eq!(&*config, expected.as_path());
 }

@@ -53,6 +53,9 @@ if !config.exists() {
 ```rust
 use app_path::app_path;
 
+// Application base directory
+let app_base = app_path!();                     // → /path/to/exe/
+
 // Simple paths
 let config = app_path!("config.toml");
 let database = app_path!("data/users.db");
@@ -89,6 +92,7 @@ app_path!("temp").create_dir()?;     // Creates temp/ directory itself
 ```rust
 use app_path::try_app_path;
 
+let app_base = try_app_path!()?;                                     // Fallible base directory
 let config = try_app_path!("config.toml")?;
 let database = try_app_path!("data/users.db", env = "DATABASE_PATH")?;
 
@@ -104,9 +108,14 @@ match try_app_path!("logs/app.log") {
 ```rust
 use app_path::AppPath;
 
-let config = AppPath::new("config.toml");
-let database = AppPath::with_override("data/users.db", std::env::var("DB_PATH").ok());
-let config = AppPath::try_new("config.toml")?; // Fallible
+// Basic constructors
+let app_base = AppPath::new();                          // Executable directory
+let config = AppPath::with("config.toml");              // App base + path
+let database = AppPath::try_with("data/users.db")?;     // Fallible version
+
+// Override constructors
+let config = AppPath::with_override("config.toml", std::env::var("CONFIG_PATH").ok());
+let database = AppPath::try_with_override("data/users.db", std::env::var("DB_PATH").ok())?;
 ```
 
 ## Real-World Examples
@@ -236,15 +245,15 @@ struct Config {
 
 // Convert when using - clean separation of concerns
 let config: Config = serde_json::from_str(&config_json)?;
-let log_path = AppPath::new(&config.log_file);
-let data_path = AppPath::new(&config.data_dir);
+let log_path = AppPath::with(&config.log_file);
+let data_path = AppPath::with(&config.data_dir);
 ```
 
 ## Installation
 
 ```toml
 [dependencies]
-app-path = "0.2"
+app-path = "1.0"
 ```
 
 ## Documentation

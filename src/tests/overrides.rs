@@ -1,4 +1,4 @@
-use crate::{app_path, exe_dir, try_app_path};
+use crate::{app_path, try_app_path};
 use std::env;
 use std::path::PathBuf;
 
@@ -19,7 +19,11 @@ fn test_env_override_with_string() {
 #[test]
 fn test_env_override_with_nonexistent_var() {
     let config = app_path!("default.toml", env = "DEFINITELY_NONEXISTENT_VAR");
-    let expected = exe_dir().join("default.toml");
+    let expected = std::env::current_exe()
+        .unwrap()
+        .parent()
+        .unwrap()
+        .join("default.toml");
     assert_eq!(&*config, expected.as_path());
 }
 
@@ -51,7 +55,11 @@ fn test_env_override_relative_path() {
 
     let config = app_path!("default.toml", env = "RELATIVE_PATH_VAR");
     // Relative path from env var is relative to current dir, not exe dir
-    let expected = exe_dir().join("config/test.toml");
+    let expected = std::env::current_exe()
+        .unwrap()
+        .parent()
+        .unwrap()
+        .join("config/test.toml");
     assert_eq!(config.path(), expected);
 
     env::remove_var("RELATIVE_PATH_VAR");
@@ -102,7 +110,11 @@ fn test_direct_override_with_some_string() {
 fn test_direct_override_with_none() {
     let override_path: Option<PathBuf> = None;
     let config = app_path!("default.toml", override = override_path);
-    let expected = exe_dir().join("default.toml");
+    let expected = std::env::current_exe()
+        .unwrap()
+        .parent()
+        .unwrap()
+        .join("default.toml");
     assert_eq!(config.path(), expected);
 }
 
@@ -117,7 +129,11 @@ fn test_direct_override_with_variable() {
 
     let no_override: Option<PathBuf> = None;
     let default_config = app_path!("default.toml", override = no_override);
-    let expected = exe_dir().join("default.toml");
+    let expected = std::env::current_exe()
+        .unwrap()
+        .parent()
+        .unwrap()
+        .join("default.toml");
     assert_eq!(default_config.path(), expected);
 }
 
@@ -134,7 +150,11 @@ fn test_fn_override_returning_some() {
 #[test]
 fn test_fn_override_returning_none() {
     let config = app_path!("default.toml", fn = || None::<PathBuf>);
-    let expected = exe_dir().join("default.toml");
+    let expected = std::env::current_exe()
+        .unwrap()
+        .parent()
+        .unwrap()
+        .join("default.toml");
     assert_eq!(config.path(), expected);
 }
 
@@ -150,7 +170,11 @@ fn test_fn_override_with_conditional_logic() {
     });
 
     // Without env var, should use default
-    let expected = exe_dir().join("config.toml");
+    let expected = std::env::current_exe()
+        .unwrap()
+        .parent()
+        .unwrap()
+        .join("config.toml");
     assert_eq!(config.path(), expected);
 
     // With env var, should use temp dir
@@ -210,7 +234,11 @@ fn test_fn_override_with_platform_specific_logic() {
 fn test_env_override_fallback_to_default() {
     // When env var doesn't exist, should fall back to default path
     let config = app_path!("fallback.toml", env = "NONEXISTENT_ENV_VAR");
-    let expected = exe_dir().join("fallback.toml");
+    let expected = std::env::current_exe()
+        .unwrap()
+        .parent()
+        .unwrap()
+        .join("fallback.toml");
     assert_eq!(config.path(), expected);
 }
 
@@ -236,7 +264,11 @@ fn test_multiple_override_scenarios() {
 
     // Test 4: no override falls back to default
     let config4 = app_path!("default.toml");
-    let expected = exe_dir().join("default.toml");
+    let expected = std::env::current_exe()
+        .unwrap()
+        .parent()
+        .unwrap()
+        .join("default.toml");
     assert_eq!(config4.path(), expected);
 
     env::remove_var("MULTI_TEST_ENV");

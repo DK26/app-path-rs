@@ -5,22 +5,22 @@ use std::collections::{HashMap, HashSet};
 
 #[test]
 fn test_partial_eq_same_path() {
-    let path1 = AppPath::new("config.toml");
-    let path2 = AppPath::new("config.toml");
+    let path1 = AppPath::with("config.toml");
+    let path2 = AppPath::with("config.toml");
     assert_eq!(path1, path2);
 }
 
 #[test]
 fn test_partial_eq_different_paths() {
-    let path1 = AppPath::new("config.toml");
-    let path2 = AppPath::new("settings.toml");
+    let path1 = AppPath::with("config.toml");
+    let path2 = AppPath::with("settings.toml");
     assert_ne!(path1, path2);
 }
 
 #[test]
 fn test_partial_eq_with_normalization() {
-    let path1 = AppPath::new("config.toml");
-    let path2 = AppPath::new("./config.toml");
+    let path1 = AppPath::with("config.toml");
+    let path2 = AppPath::with("./config.toml");
     // These might be equal after normalization, depending on implementation
     // The exact behavior depends on how the library handles path normalization
     let _ = path1 == path2; // Just verify it compiles and doesn't panic
@@ -30,9 +30,9 @@ fn test_partial_eq_with_normalization() {
 
 #[test]
 fn test_hash_trait() {
-    let path1 = AppPath::new("config.toml");
-    let path2 = AppPath::new("config.toml");
-    let path3 = AppPath::new("settings.toml");
+    let path1 = AppPath::with("config.toml");
+    let path2 = AppPath::with("config.toml");
+    let path3 = AppPath::with("settings.toml");
 
     let mut map = HashMap::new();
     map.insert(path1.clone(), "config data");
@@ -45,10 +45,10 @@ fn test_hash_trait() {
 #[test]
 fn test_hash_consistency() {
     let paths = vec![
-        AppPath::new("config.toml"),
-        AppPath::new("settings.toml"),
-        AppPath::new("data.json"),
-        AppPath::new("config.toml"), // Duplicate
+        AppPath::with("config.toml"),
+        AppPath::with("settings.toml"),
+        AppPath::with("data.json"),
+        AppPath::with("config.toml"), // Duplicate
     ];
 
     let unique_paths: HashSet<_> = paths.into_iter().collect();
@@ -59,9 +59,9 @@ fn test_hash_consistency() {
 
 #[test]
 fn test_partial_ord() {
-    let path1 = AppPath::new("a.toml");
-    let path2 = AppPath::new("b.toml");
-    let path3 = AppPath::new("c.toml");
+    let path1 = AppPath::with("a.toml");
+    let path2 = AppPath::with("b.toml");
+    let path3 = AppPath::with("c.toml");
 
     assert!(path1 < path2);
     assert!(path2 < path3);
@@ -71,9 +71,9 @@ fn test_partial_ord() {
 #[test]
 fn test_ord_sorting() {
     let mut paths = [
-        AppPath::new("z.toml"),
-        AppPath::new("a.toml"),
-        AppPath::new("m.toml"),
+        AppPath::with("z.toml"),
+        AppPath::with("a.toml"),
+        AppPath::with("m.toml"),
     ];
 
     paths.sort();

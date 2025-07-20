@@ -13,7 +13,7 @@ impl AppPath {
     /// ```rust
     /// use app_path::AppPath;
     ///
-    /// let config = AppPath::new("config.toml");
+    /// let config = AppPath::with("config.toml");
     ///
     /// // For displaying paths - use Display trait
     /// println!("Config path: {}", config.display());
@@ -44,18 +44,18 @@ impl AppPath {
     /// ```rust
     /// use app_path::AppPath;
     ///
-    /// let data_dir = AppPath::new("data");
+    /// let data_dir = AppPath::with("data");
     /// let users_db = data_dir.join("users.db");
     /// let backups = data_dir.join("backups").join("daily");
     ///
     /// // Chain operations for complex paths
-    /// let log_file = AppPath::new("logs")
+    /// let log_file = AppPath::with("logs")
     ///     .join("2024")
     ///     .join("app.log");
     /// ```
     #[inline]
     pub fn join(&self, path: impl AsRef<Path>) -> Self {
-        Self::new(self.full_path.join(path))
+        Self::from_absolute_path(self.full_path.join(path))
     }
 
     /// Returns the parent directory as an AppPath, if it exists.
@@ -67,15 +67,15 @@ impl AppPath {
     /// ```rust
     /// use app_path::AppPath;
     ///
-    /// let config = AppPath::new("config/app.toml");
+    /// let config = AppPath::with("config/app.toml");
     /// let config_dir = config.parent().unwrap();
     ///
-    /// let logs_dir = AppPath::new("logs");
+    /// let logs_dir = AppPath::with("logs");
     /// let _app_dir = logs_dir.parent(); // Points to exe directory
     /// ```
     #[inline]
     pub fn parent(&self) -> Option<Self> {
-        self.full_path.parent().map(Self::new)
+        self.full_path.parent().map(Self::from_absolute_path)
     }
 
     /// Creates a new AppPath with the specified file extension.
@@ -88,16 +88,16 @@ impl AppPath {
     /// ```rust
     /// use app_path::AppPath;
     ///
-    /// let config = AppPath::new("config");
+    /// let config = AppPath::with("config");
     /// let config_toml = config.with_extension("toml");
     /// let config_json = config.with_extension("json");
     ///
-    /// let log_file = AppPath::new("app.log");
+    /// let log_file = AppPath::with("app.log");
     /// let backup_file = log_file.with_extension("bak");
     /// ```
     #[inline]
     pub fn with_extension(&self, ext: &str) -> Self {
-        Self::new(self.full_path.with_extension(ext))
+        Self::from_absolute_path(self.full_path.with_extension(ext))
     }
 
     /// Consumes the `AppPath` and returns the internal `PathBuf`.
@@ -112,7 +112,7 @@ impl AppPath {
     /// use app_path::AppPath;
     /// use std::path::PathBuf;
     ///
-    /// let app_path = AppPath::new("config.toml");
+    /// let app_path = AppPath::with("config.toml");
     /// let path_buf: PathBuf = app_path.into_path_buf();
     ///
     /// // Now you have a regular PathBuf for operations that need ownership
@@ -134,7 +134,7 @@ impl AppPath {
     /// use app_path::AppPath;
     /// use std::path::PathBuf;
     ///
-    /// let app_path = AppPath::new("config.toml");
+    /// let app_path = AppPath::with("config.toml");
     /// let path_buf: PathBuf = app_path.into_inner();
     ///
     /// // Now you have a regular PathBuf for operations that need ownership
@@ -164,7 +164,7 @@ impl AppPath {
     /// ```rust
     /// use app_path::AppPath;
     ///
-    /// let config = AppPath::new("config.toml");
+    /// let config = AppPath::with("config.toml");
     /// let bytes = config.to_bytes();
     ///
     /// // Platform-specific byte operations
@@ -210,7 +210,7 @@ impl AppPath {
     /// ```rust
     /// use app_path::AppPath;
     ///
-    /// let config = AppPath::new("config.toml");
+    /// let config = AppPath::with("config.toml");
     /// let owned_bytes = config.into_bytes();
     ///
     /// // Owned bytes can be moved and stored

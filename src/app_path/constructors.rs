@@ -1,49 +1,30 @@
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use crate::{try_exe_dir, AppPath, AppPathError};
 
 impl AppPath {
-    /// Creates file paths relative to the executable location.
+    /// Returns the application's base directory as an AppPath.
     ///
-    /// **This is the primary method for creating AppPath instances.** It provides clean,
-    /// idiomatic code for the 99% of applications that don't need explicit error handling.
+    /// **This is the primary method for getting the application's base directory.** It provides clean,
+    /// idiomatic code for the common case of needing the application's base location.
     ///
-    /// AppPath automatically resolves relative paths based on your executable's location,
-    /// making file access portable and predictable across different deployment scenarios.
+    /// By default, the application's base directory is the executable's directory, but this can
+    /// be overridden through environment variables or other configuration mechanisms using the
+    /// override methods like [`Self::with_override()`].
     ///
-    /// ## When to Use
-    ///
-    /// **Use `new()` for:**
-    /// - Desktop, web, server, CLI applications (recommended)
-    /// - When you want simple, clean code
-    /// - When executable location issues should halt the application
-    ///
-    /// **Use [`Self::try_new()`] for:**
-    /// - Reusable libraries that shouldn't panic  
-    /// - System tools with fallback strategies
-    /// - Applications running in unusual environments
-    ///
-    /// ## Path Resolution
-    ///
-    /// - **Relative paths**: Resolved relative to executable directory
-    /// - **Absolute paths**: Used as-is (not recommended - defeats portability)
-    /// - **Path separators**: Automatically normalized for current platform
+    /// Use this when you need the application's base directory itself, then use [`join()`](Self::join)
+    /// to build paths relative to it, or use [`Self::with()`] directly for one-step creation.
     ///
     /// ## Global Caching Behavior
     ///
-    /// The executable directory is determined once on first call and cached globally.
+    /// The application's base directory is determined once on first call and cached globally.
     /// All subsequent calls use the cached value for maximum performance.
     ///
     /// # Panics
     ///
-    /// Panics only if the executable location cannot be determined, which is extremely rare
+    /// Panics only if the application's base directory cannot be determined, which is extremely rare
     /// and typically indicates fundamental system issues (corrupted installation, permission problems).
     /// After the first successful call, this method never panics.
-    ///
-    /// # Arguments
-    ///
-    /// * `path` - A path that will be resolved according to AppPath's resolution strategy.
-    ///   Accepts any type implementing [`AsRef<Path>`] (strings, Path, PathBuf, etc.).
     ///
     /// # Examples
     ///
@@ -52,15 +33,15 @@ impl AppPath {
     /// ```rust
     /// use app_path::AppPath;
     ///
-    /// // Configuration file next to executable
-    /// let config = AppPath::new("config.toml");
+    /// // Get the application's base directory (defaults to executable directory)
+    /// let app_base = AppPath::new();
     ///
-    /// // Data directory relative to executable
-    /// let data_dir = AppPath::new("data");
+    /// // Build paths relative to it
+    /// let config = app_base.join("config.toml");
+    /// let data_dir = app_base.join("data");
     ///
-    /// // Nested paths work naturally
-    /// let user_profile = AppPath::new("data/users/profile.json");
-    /// let log_file = AppPath::new("logs/app.log");
+    /// // Or chain operations
+    /// let log_file = AppPath::new().join("logs").join("app.log");
     /// ```
     ///
     /// ## Real Application Examples
@@ -69,52 +50,38 @@ impl AppPath {
     /// use app_path::AppPath;
     /// use std::fs;
     ///
-    /// // Load configuration with fallback to defaults
-    /// let config_path = AppPath::new("config.toml");
-    /// let config = if config_path.exists() {
-    ///     fs::read_to_string(config_path.path())?
-    /// } else {
-    ///     "default_config = true".to_string() // Use defaults
-    /// };
+    /// // Get application base directory for setup operations
+    /// let app_base = AppPath::new();
+    /// println!("Application base directory: {}", app_base.display());
     ///
-    /// // Set up application data directory
-    /// let data_dir = AppPath::new("data");
-    /// data_dir.create_dir()?; // Creates directory if needed
-    ///
-    /// // Prepare for log file creation
-    /// let log_file = AppPath::new("logs/app.log");
-    /// log_file.create_parents()?; // Ensures logs/ directory exists
+    /// // Create application directory structure
+    /// app_base.join("data").create_dir()?;
+    /// app_base.join("logs").create_dir()?;
+    /// app_base.join("config").create_dir()?;
     ///
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
     ///
-    /// ## Portable File Access
+    /// ## Portable Directory Access
     ///
     /// ```rust
     /// use app_path::AppPath;
-    /// use std::fs;
     ///
-    /// // These paths work regardless of where the executable is installed:
-    /// // - C:\Program Files\MyApp\config.toml (Windows)
-    /// // - /usr/local/bin/config.toml (Linux)
-    /// // - /Applications/MyApp.app/Contents/MacOS/config.toml (macOS)
-    /// // - .\myapp\config.toml (development)
+    /// // Get application base directory regardless of installation location:
+    /// // - C:\Program Files\MyApp\ (Windows)
+    /// // - /usr/local/bin/ (Linux)
+    /// // - /Applications/MyApp.app/Contents/MacOS/ (macOS)
+    /// // - .\target\debug\ (development)
     ///
-    /// let settings = AppPath::new("settings.json");
-    /// let cache = AppPath::new("cache");
-    /// let templates = AppPath::new("templates/default.html");
-    ///
-    /// // Use with standard library functions
-    /// if settings.exists() {
-    ///     let content = fs::read_to_string(&settings)?;
-    /// }
-    /// cache.create_dir()?; // Creates cache/ directory
+    /// let exe_dir = AppPath::new();
+    /// let readme = exe_dir.join("README.txt");
+    /// let license = exe_dir.join("LICENSE");
     ///
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
     #[inline]
-    pub fn new(path: impl AsRef<Path>) -> Self {
-        match Self::try_new(path) {
+    pub fn new() -> Self {
+        match Self::try_new() {
             Ok(app_path) => app_path,
             Err(e) => panic!("Failed to create AppPath: {e}"),
         }
@@ -143,7 +110,7 @@ impl AppPath {
     ///
     /// // Library with graceful error handling
     /// fn load_config() -> Result<String, AppPathError> {
-    ///     let config_path = AppPath::try_new("config.toml")?;
+    ///     let config_path = AppPath::try_with("config.toml")?;
     ///     // Load configuration...
     ///     Ok("config loaded".to_string())
     /// }
@@ -192,7 +159,7 @@ impl AppPath {
     ///
     /// ## Global Caching Behavior
     ///
-    /// Once the executable directory is successfully determined by either this method or [`AppPath::new()`],
+    /// Once the application's base directory is successfully determined by either this method or [`AppPath::new()`],
     /// the result is cached globally and all subsequent calls to both methods will use the cached value.
     /// This means that after the first successful call, `try_new()` will never return an error.
     ///
@@ -215,7 +182,7 @@ impl AppPath {
     ///
     /// // Library function that returns Result instead of panicking
     /// pub fn create_config_manager() -> Result<ConfigManager, AppPathError> {
-    ///     let config_path = AppPath::try_new("config.toml")?;
+    ///     let config_path = AppPath::try_with("config.toml")?;
     ///     Ok(ConfigManager::new(config_path))
     /// }
     ///
@@ -236,8 +203,8 @@ impl AppPath {
     /// use app_path::{AppPath, AppPathError};
     ///
     /// fn initialize_app() -> Result<(), Box<dyn std::error::Error>> {
-    ///     let config = AppPath::try_new("config.toml")?;
-    ///     let data = AppPath::try_new("data/app.db")?;
+    ///     let config = AppPath::try_with("config.toml")?;
+    ///     let data = AppPath::try_with("data/app.db")?;
     ///     
     ///     // Initialize application with these paths
     ///     println!("Config: {}", config.path().display());
@@ -254,13 +221,194 @@ impl AppPath {
     /// - [`AppPathError::InvalidExecutablePath`] - Executable path is empty (system corruption)
     ///
     /// These errors represent unrecoverable system failures that occur at application startup.
-    /// After the first successful call, the executable directory is cached and this method
+    /// After the first successful call, the application's base directory is cached and this method
     /// will never return an error.
     #[inline]
-    pub fn try_new(path: impl AsRef<Path>) -> Result<Self, AppPathError> {
+    pub fn try_new() -> Result<Self, AppPathError> {
+        let exe_dir = try_exe_dir()?;
+        Ok(Self {
+            full_path: exe_dir.to_path_buf(),
+        })
+    }
+
+    /// Creates file paths relative to the application's base directory (fallible).
+    ///
+    /// **Use this only for libraries or specialized applications requiring explicit error handling.**
+    /// Most applications should use [`Self::with()`] instead for simpler, cleaner code.
+    ///
+    /// ## When to Use
+    ///
+    /// **Use `try_with()` for:**
+    /// - Reusable libraries that shouldn't panic
+    /// - System tools with fallback strategies
+    /// - Applications running in unusual environments
+    ///
+    /// **Use [`Self::with()`] for:**
+    /// - Desktop, web, server, CLI applications
+    /// - When you want simple, clean code (recommended)
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use app_path::{AppPath, AppPathError};
+    ///
+    /// // Library with graceful error handling
+    /// fn load_config() -> Result<String, AppPathError> {
+    ///     let config_path = AppPath::try_with("config.toml")?;
+    ///     // Load configuration...
+    ///     Ok("config loaded".to_string())
+    /// }
+    ///
+    /// // Better: Use override API for environment variables
+    /// fn load_config_with_override() -> Result<String, AppPathError> {
+    ///     let config_path = AppPath::try_with_override(
+    ///         "config.toml",
+    ///         std::env::var("APP_CONFIG").ok()
+    ///     )?;
+    ///     // Load configuration...
+    ///     Ok("config loaded".to_string())
+    /// }
+    /// ```
+    ///
+    /// After the first successful call, the application's base directory is cached and this method
+    /// will never return an error.
+    #[inline]
+    pub fn try_with(path: impl AsRef<Path>) -> Result<Self, AppPathError> {
         let exe_dir = try_exe_dir()?;
         let full_path = exe_dir.join(path);
         Ok(Self { full_path })
+    }
+
+    /// Creates an AppPath from an absolute path.
+    ///
+    /// This is an internal helper for operations that need to create AppPath
+    /// instances from already-resolved absolute paths (like join, with_extension, etc).
+    ///
+    /// # Arguments
+    ///
+    /// * `path` - An absolute path that will be stored directly
+    #[inline]
+    pub(crate) fn from_absolute_path(path: impl Into<PathBuf>) -> Self {
+        Self {
+            full_path: path.into(),
+        }
+    }
+
+    /// Creates file paths relative to the application's base directory.
+    ///
+    /// **This is the primary method for creating paths relative to your application's base directory.**
+    /// It provides clean, idiomatic code for the 99% of applications that don't need explicit error handling.
+    ///
+    /// AppPath automatically resolves relative paths based on your application's base directory,
+    /// making file access portable and predictable across different deployment scenarios.
+    ///
+    /// ## When to Use
+    ///
+    /// **Use `with()` for:**
+    /// - Desktop, web, server, CLI applications (recommended)
+    /// - When you want simple, clean code
+    /// - When application location issues should halt the application
+    ///
+    /// **Use [`Self::try_with()`] for:**
+    /// - Reusable libraries that shouldn't panic  
+    /// - System tools with fallback strategies
+    /// - Applications running in unusual environments
+    ///
+    /// ## Path Resolution
+    ///
+    /// - **Relative paths**: Resolved relative to application's base directory
+    /// - **Absolute paths**: Used as-is (not recommended - defeats portability)
+    /// - **Path separators**: Automatically normalized for current platform
+    ///
+    /// ## Global Caching Behavior
+    ///
+    /// The application's base directory is determined once on first call and cached globally.
+    /// All subsequent calls use the cached value for maximum performance.
+    ///
+    /// # Panics
+    ///
+    /// Panics only if the application's base directory cannot be determined, which is extremely rare
+    /// and typically indicates fundamental system issues (corrupted installation, permission problems).
+    /// After the first successful call, this method never panics.
+    ///
+    /// # Arguments
+    ///
+    /// * `path` - A path that will be resolved according to AppPath's resolution strategy.
+    ///   Accepts any type implementing [`AsRef<Path>`] (strings, Path, PathBuf, etc.).
+    ///
+    /// # Examples
+    ///
+    /// ## Basic Usage
+    ///
+    /// ```rust
+    /// use app_path::AppPath;
+    ///
+    /// // Configuration file next to application
+    /// let config = AppPath::with("config.toml");
+    ///
+    /// // Data directory relative to application
+    /// let data_dir = AppPath::with("data");
+    ///
+    /// // Nested paths work naturally
+    /// let user_profile = AppPath::with("data/users/profile.json");
+    /// let log_file = AppPath::with("logs/app.log");
+    /// ```
+    ///
+    /// ## Real Application Examples
+    ///
+    /// ```rust
+    /// use app_path::AppPath;
+    /// use std::fs;
+    ///
+    /// // Load configuration with fallback to defaults
+    /// let config_path = AppPath::with("config.toml");
+    /// let config = if config_path.exists() {
+    ///     fs::read_to_string(&config_path)?
+    /// } else {
+    ///     "default_config = true".to_string() // Use defaults
+    /// };
+    ///
+    /// // Set up application data directory
+    /// let data_dir = AppPath::with("data");
+    /// data_dir.create_dir()?; // Creates directory if needed
+    ///
+    /// // Prepare for log file creation
+    /// let log_file = AppPath::with("logs/app.log");
+    /// log_file.create_parents()?; // Ensures logs/ directory exists
+    ///
+    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// ```
+    ///
+    /// ## Portable File Access
+    ///
+    /// ```rust
+    /// use app_path::AppPath;
+    /// use std::fs;
+    ///
+    /// // These paths work regardless of where the application is installed:
+    /// // - C:\Program Files\MyApp\config.toml (Windows)
+    /// // - /usr/local/bin/config.toml (Linux)
+    /// // - /Applications/MyApp.app/Contents/MacOS/config.toml (macOS)
+    /// // - .\myapp\config.toml (development)
+    ///
+    /// let settings = AppPath::with("settings.json");
+    /// let cache = AppPath::with("cache");
+    /// let templates = AppPath::with("templates/default.html");
+    ///
+    /// // Use with standard library functions
+    /// if settings.exists() {
+    ///     let content = fs::read_to_string(&settings)?;
+    /// }
+    /// cache.create_dir()?; // Creates cache/ directory
+    ///
+    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// ```
+    #[inline]
+    pub fn with(path: impl AsRef<Path>) -> Self {
+        match Self::try_with(path) {
+            Ok(app_path) => app_path,
+            Err(e) => panic!("Failed to create AppPath: {e}"),
+        }
     }
 
     /// Creates a path with override support (infallible).
@@ -315,8 +463,8 @@ impl AppPath {
         override_option: Option<impl AsRef<Path>>,
     ) -> Self {
         match override_option {
-            Some(override_path) => Self::new(override_path),
-            None => Self::new(default),
+            Some(override_path) => Self::with(override_path),
+            None => Self::with(default),
         }
     }
 
@@ -360,8 +508,8 @@ impl AppPath {
         override_fn: impl FnOnce() -> Option<P>,
     ) -> Self {
         match override_fn() {
-            Some(override_path) => Self::new(override_path),
-            None => Self::new(default),
+            Some(override_path) => Self::with(override_path),
+            None => Self::with(default),
         }
     }
 
@@ -440,8 +588,8 @@ impl AppPath {
         override_option: Option<impl AsRef<Path>>,
     ) -> Result<Self, AppPathError> {
         match override_option {
-            Some(override_path) => Self::try_new(override_path),
-            None => Self::try_new(default),
+            Some(override_path) => Self::try_with(override_path),
+            None => Self::try_with(default),
         }
     }
 
@@ -528,8 +676,8 @@ impl AppPath {
         override_fn: impl FnOnce() -> Option<P>,
     ) -> Result<Self, AppPathError> {
         match override_fn() {
-            Some(override_path) => Self::try_new(override_path),
-            None => Self::try_new(default),
+            Some(override_path) => Self::try_with(override_path),
+            None => Self::try_with(default),
         }
     }
 }

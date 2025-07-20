@@ -37,30 +37,48 @@
 //!
 //! ## API Design
 //!
-//! - [`AppPath::new()`] - **Recommended**: Simple constructor (panics on failure)
-//! - [`AppPath::try_new()`] - **Libraries**: Fallible version for error handling
+//! ### Constructors
+//!
+//! - [`AppPath::new()`] - **Application base directory**: Returns the directory containing the executable
+//! - [`AppPath::with()`] - **Primary API**: Create paths relative to application base directory
+//! - [`AppPath::try_new()`] - **Libraries**: Fallible version for getting application base directory
+//! - [`AppPath::try_with()`] - **Libraries**: Fallible version for creating relative paths
 //! - [`AppPath::with_override()`] - **Deployment**: Environment-configurable paths
+//! - [`AppPath::try_with_override()`] - **Deployment (Fallible)**: Fallible environment-configurable paths
 //! - [`AppPath::with_override_fn()`] - **Advanced**: Function-based override logic
-//! - [`app_path!`] - **Macro**: Convenient syntax with optional environment overrides
-//! - [`try_app_path!`] - **Macro (Fallible)**: Returns `Result` for explicit error handling
+//! - [`AppPath::try_with_override_fn()`] - **Advanced (Fallible)**: Fallible function-based override logic
+//!
+//! ### Directory Creation
+//!
 //! - [`AppPath::create_parents()`] - **Files**: Creates parent directories for files
 //! - [`AppPath::create_dir()`] - **Directories**: Creates directories (and parents)
+//!
+//! ### Path Operations & Traits
+//!
+//! - **All `Path` methods**: Available directly via `Deref<Target=Path>` (e.g., `exists()`, `is_file()`, `file_name()`, `extension()`)
+//! - [`AppPath::into_path_buf()`] - **Conversion**: Extract owned `PathBuf` from wrapper
+//! - [`AppPath::into_inner()`] - **Conversion**: Alias for `into_path_buf()` following Rust patterns
 //! - [`AppPath::to_bytes()`] - **Ecosystem**: Raw bytes for specialized libraries
 //! - [`AppPath::into_bytes()`] - **Ecosystem**: Owned bytes for specialized libraries
-//! - [`exe_dir()`] - **Advanced**: Direct access to executable directory (panics on failure)
-//! - [`try_exe_dir()`] - **Libraries**: Fallible executable directory access
 //!
-//! ## Function Variants
+//! ### Convenience Macros
+//!
+//! - [`app_path!`] - **Macro**: Convenient syntax with optional environment overrides
+//! - [`try_app_path!`] - **Macro (Fallible)**: Returns `Result` for explicit error handling
+//!
+//! ## Constructor Variants
 //!
 //! This crate provides both panicking and fallible variants for most operations:
 //!
 //! | Panicking (Recommended) | Fallible (Libraries) | Use Case |
 //! |------------------------|---------------------|----------|
-//! | [`AppPath::new()`] | [`AppPath::try_new()`] | Constructor methods |
+//! | [`AppPath::new()`] | [`AppPath::try_new()`] | Get application base directory |
+//! | [`AppPath::with()`] | [`AppPath::try_with()`] | Create relative paths |
+//! | [`AppPath::with_override()`] | [`AppPath::try_with_override()`] | Environment-configurable paths |
+//! | [`AppPath::with_override_fn()`] | [`AppPath::try_with_override_fn()`] | Function-based override logic |
 //! | [`app_path!`] | [`try_app_path!`] | Convenient macros |
-//! | [`exe_dir()`] | [`try_exe_dir()`] | Direct directory access |
 //!
-//! ### Macro Syntax Variants
+//! ## Macro Syntax Variants
 //!
 //! Both `app_path!` and `try_app_path!` macros support four syntax forms for maximum flexibility:
 //!
@@ -85,7 +103,7 @@
 //! // → Uses function result if Some, otherwise /path/to/exe/config.toml
 //! ```
 //!
-//! ### Variable Capturing
+//! ### Variable Capturing in Macros
 //!
 //! Both macros support variable capturing in complex expressions:
 //!
@@ -128,7 +146,7 @@
 //! use camino::Utf8PathBuf;
 //!
 //! let static_dir = app_path!("web/static");
-//! let utf8_static = Utf8PathBuf::from_path_buf(static_dir.into())
+//! let utf8_static = Utf8PathBuf::from_path_buf(static_dir.into_path_buf())
 //!     .map_err(|_| "Invalid UTF-8 path")?;
 //! # Ok::<(), Box<dyn std::error::Error>>(())
 //! ```
@@ -147,7 +165,7 @@
 //!
 //! ## Panic Conditions
 //!
-//! [`AppPath::new()`] and [`exe_dir()`] panic only if executable location cannot be determined:
+//! [`AppPath::new()`] panics only if executable location cannot be determined:
 //! - `std::env::current_exe()` fails (extremely rare system failure)
 //! - Executable path is empty (indicates system corruption)
 //!
@@ -156,7 +174,7 @@
 //! calls never panic.
 //!
 //! **For libraries or applications requiring graceful error handling**, use the fallible
-//! variants [`AppPath::try_new()`] and [`try_exe_dir()`] instead.
+//! variant [`AppPath::try_new()`] instead.
 
 mod app_path;
 mod error;
@@ -168,13 +186,16 @@ mod tests;
 // Re-export the public API
 pub use app_path::AppPath;
 pub use error::AppPathError;
-pub use functions::{exe_dir, try_exe_dir};
+
+// Internal functions for tests and crate internals
+pub(crate) use functions::try_exe_dir;
 
 /// Convenience macro for creating `AppPath` instances with optional environment variable overrides.
 ///
 /// # Syntax
 ///
-/// - `app_path!(path)` - Simple path creation
+/// - `app_path!()` - Application base directory (equivalent to `AppPath::new()`)
+/// - `app_path!(path)` - Simple path creation (equivalent to `AppPath::with(path)`)
 /// - `app_path!(path, env = "VAR_NAME")` - With environment variable override
 /// - `app_path!(path, override = expression)` - With optional override expression
 /// - `app_path!(path, fn = function)` - With function-based override logic
@@ -190,8 +211,11 @@ pub use functions::{exe_dir, try_exe_dir};
 /// ```
 #[macro_export]
 macro_rules! app_path {
+    () => {
+        $crate::AppPath::new()
+    };
     ($path:expr) => {
-        $crate::AppPath::new($path)
+        $crate::AppPath::with($path)
     };
     ($path:expr, env = $env_var:expr) => {
         $crate::AppPath::with_override($path, ::std::env::var($env_var).ok())
@@ -212,7 +236,8 @@ macro_rules! app_path {
 ///
 /// # Syntax
 ///
-/// - `try_app_path!(path)` - Simple path creation (equivalent to `AppPath::try_new(path)`)
+/// - `try_app_path!()` - Application base directory (equivalent to `AppPath::try_new()`)
+/// - `try_app_path!(path)` - Simple path creation (equivalent to `AppPath::try_with(path)`)
 /// - `try_app_path!(path, env = "VAR_NAME")` - With environment variable override
 /// - `try_app_path!(path, override = expression)` - With any optional override expression
 /// - `try_app_path!(path, fn = function)` - With function-based override logic
@@ -299,12 +324,15 @@ macro_rules! app_path {
 /// # See Also
 ///
 /// - [`app_path!`] - Panicking version with identical syntax
-/// - [`AppPath::try_new`] - Constructor equivalent
-/// - [`AppPath::try_with_override`] - Constructor with override equivalent
+/// - [`AppPath::try_new()`] - Constructor equivalent
+/// - [`AppPath::try_with_override()`] - Constructor with override equivalent
 #[macro_export]
 macro_rules! try_app_path {
+    () => {
+        $crate::AppPath::try_new()
+    };
     ($path:expr) => {
-        $crate::AppPath::try_new($path)
+        $crate::AppPath::try_with($path)
     };
     ($path:expr, env = $env_var:expr) => {
         $crate::AppPath::try_with_override($path, ::std::env::var($env_var).ok())

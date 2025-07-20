@@ -1,11 +1,31 @@
-use crate::{app_path, exe_dir, try_app_path, AppPath};
+use crate::{app_path, try_app_path, AppPath};
 use std::env;
 use std::path::PathBuf;
 
 #[test]
+fn test_app_path_macro_no_params() {
+    let app_base = app_path!();
+
+    // Should return an absolute path pointing to executable directory
+    assert!(app_base.is_absolute());
+
+    // Should match what std::env::current_exe() tells us (independent verification)
+    let current_exe = std::env::current_exe().unwrap();
+    let exe_parent = current_exe.parent().unwrap();
+    assert_eq!(app_base.path(), exe_parent);
+
+    // Should be consistent across multiple calls (caching behavior)
+    let app_base2 = app_path!();
+    assert_eq!(app_base.path(), app_base2.path());
+
+    // Should be a directory, not a file
+    assert!(app_base.is_dir());
+}
+
+#[test]
 fn test_app_path_macro_basic() {
     let config = app_path!("config.toml");
-    let expected = AppPath::new("config.toml");
+    let expected = AppPath::with("config.toml");
     assert_eq!(config.path(), expected.path());
 }
 
@@ -20,7 +40,11 @@ fn test_app_path_macro_with_env() {
 
     // Test with non-existent env var
     let default_config = app_path!("default.toml", env = "NON_EXISTENT_VAR");
-    let expected = exe_dir().join("default.toml");
+    let expected = std::env::current_exe()
+        .unwrap()
+        .parent()
+        .unwrap()
+        .join("default.toml");
     assert_eq!(default_config.path(), expected);
 
     env::remove_var("TEST_CONFIG_PATH");
@@ -35,7 +59,11 @@ fn test_app_path_macro_with_override() {
 
     let no_override: Option<PathBuf> = None;
     let default_config = app_path!("default.toml", override = no_override);
-    let expected = exe_dir().join("default.toml");
+    let expected = std::env::current_exe()
+        .unwrap()
+        .parent()
+        .unwrap()
+        .join("default.toml");
     assert_eq!(default_config.path(), expected);
 }
 
@@ -49,7 +77,11 @@ fn test_app_path_macro_with_fn() {
 
     // Test fn variant that returns None
     let default_config = app_path!("default.toml", fn = || None::<PathBuf>);
-    let expected = exe_dir().join("default.toml");
+    let expected = std::env::current_exe()
+        .unwrap()
+        .parent()
+        .unwrap()
+        .join("default.toml");
     assert_eq!(default_config.path(), expected);
 
     // Test fn variant with complex logic
@@ -60,16 +92,43 @@ fn test_app_path_macro_with_fn() {
             None
         }
     });
-    let expected_complex = exe_dir().join("config.toml");
+    let expected_complex = std::env::current_exe()
+        .unwrap()
+        .parent()
+        .unwrap()
+        .join("config.toml");
     assert_eq!(complex_config.path(), expected_complex);
 }
 
 // === try_app_path! Macro Tests ===
 
 #[test]
+fn test_try_app_path_macro_no_params() {
+    let result = try_app_path!();
+    assert!(result.is_ok());
+
+    let app_base = result.unwrap();
+
+    // Should return an absolute path pointing to executable directory
+    assert!(app_base.is_absolute());
+
+    // Should match what std::env::current_exe() tells us (independent verification)
+    let current_exe = std::env::current_exe().unwrap();
+    let exe_parent = current_exe.parent().unwrap();
+    assert_eq!(app_base.path(), exe_parent);
+
+    // Should be consistent with panicking version
+    let panicking_version = app_path!();
+    assert_eq!(app_base.path(), panicking_version.path());
+
+    // Should be a directory, not a file
+    assert!(app_base.is_dir());
+}
+
+#[test]
 fn test_try_app_path_macro_basic() {
     let config = try_app_path!("config.toml").unwrap();
-    let expected = AppPath::try_new("config.toml").unwrap();
+    let expected = AppPath::try_with("config.toml").unwrap();
     assert_eq!(config.path(), expected.path());
 }
 
@@ -84,7 +143,11 @@ fn test_try_app_path_macro_with_env() {
 
     // Test with non-existent env var
     let default_config = try_app_path!("default.toml", env = "NON_EXISTENT_VAR").unwrap();
-    let expected = exe_dir().join("default.toml");
+    let expected = std::env::current_exe()
+        .unwrap()
+        .parent()
+        .unwrap()
+        .join("default.toml");
     assert_eq!(default_config.path(), expected);
 
     env::remove_var("TEST_TRY_CONFIG_PATH");
@@ -99,7 +162,11 @@ fn test_try_app_path_macro_with_override() {
 
     let no_override: Option<PathBuf> = None;
     let default_config = try_app_path!("default.toml", override = no_override).unwrap();
-    let expected = exe_dir().join("default.toml");
+    let expected = std::env::current_exe()
+        .unwrap()
+        .parent()
+        .unwrap()
+        .join("default.toml");
     assert_eq!(default_config.path(), expected);
 }
 
@@ -113,7 +180,11 @@ fn test_try_app_path_macro_with_fn() {
 
     // Test fn variant that returns None
     let default_config = try_app_path!("default.toml", fn = || None::<PathBuf>).unwrap();
-    let expected = exe_dir().join("default.toml");
+    let expected = std::env::current_exe()
+        .unwrap()
+        .parent()
+        .unwrap()
+        .join("default.toml");
     assert_eq!(default_config.path(), expected);
 
     // Test fn variant with complex logic
@@ -125,7 +196,11 @@ fn test_try_app_path_macro_with_fn() {
         }
     })
     .unwrap();
-    let expected_complex = exe_dir().join("config.toml");
+    let expected_complex = std::env::current_exe()
+        .unwrap()
+        .parent()
+        .unwrap()
+        .join("config.toml");
     assert_eq!(complex_config.path(), expected_complex);
 }
 
@@ -205,7 +280,11 @@ fn test_fn_variant_with_real_xdg_logic() {
         }
     } else {
         // If no XDG variables, should use default path
-        let expected = exe_dir().join("config.toml");
+        let expected = std::env::current_exe()
+            .unwrap()
+            .parent()
+            .unwrap()
+            .join("config.toml");
         assert_eq!(config_app_path.path(), expected);
     }
 }

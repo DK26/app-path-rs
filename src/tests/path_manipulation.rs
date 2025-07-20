@@ -1,4 +1,4 @@
-use crate::{app_path, exe_dir, AppPath};
+use crate::{app_path, AppPath};
 use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
 
@@ -52,7 +52,10 @@ fn test_parent() {
     let root_file = app_path!("app.toml");
     let parent_of_root = root_file.parent().unwrap();
     // Parent should be the exe directory
-    assert_eq!(parent_of_root.path(), exe_dir());
+    assert_eq!(
+        parent_of_root.path(),
+        std::env::current_exe().unwrap().parent().unwrap()
+    );
 }
 
 // === Path Joining and Manipulation ===
@@ -74,7 +77,7 @@ fn test_join() {
 #[test]
 fn test_with_file_name() {
     let original = app_path!("config.toml");
-    let renamed = AppPath::new(original.with_file_name("settings.toml"));
+    let renamed = AppPath::with(original.with_file_name("settings.toml"));
     assert!(renamed.ends_with("settings.toml"));
     assert!(!renamed.ends_with("config.toml"));
 
@@ -98,7 +101,8 @@ fn test_with_extension() {
 
 #[test]
 fn test_starts_with() {
-    let exe_path = exe_dir();
+    let exe_exe = std::env::current_exe().unwrap();
+    let exe_path = exe_exe.parent().unwrap();
     let config_path = app_path!("config.toml");
 
     // App paths should start with the exe directory
@@ -122,7 +126,8 @@ fn test_ends_with() {
 
 #[test]
 fn test_strip_prefix() {
-    let exe_path = exe_dir();
+    let exe_exe = std::env::current_exe().unwrap();
+    let exe_path = exe_exe.parent().unwrap();
     let config_path = app_path!("config/app.toml");
 
     let relative = config_path.strip_prefix(exe_path).unwrap();
@@ -226,7 +231,7 @@ fn test_complex_path_building() {
         backup_file.ends_with("data/config/settings.backup")
             || backup_file.ends_with("data\\config\\settings.backup")
     );
-    assert!(backup_file.starts_with(exe_dir()));
+    assert!(backup_file.starts_with(std::env::current_exe().unwrap().parent().unwrap()));
 }
 
 #[test]
@@ -285,14 +290,17 @@ fn test_root_file_manipulation() {
 
     // Should be able to get parent (exe directory)
     let parent = root_file.parent().unwrap();
-    assert_eq!(parent.path(), exe_dir());
+    assert_eq!(
+        parent.path(),
+        std::env::current_exe().unwrap().parent().unwrap()
+    );
 
     // Should be able to change extension
     let json_version = root_file.with_extension("json");
     assert!(json_version.ends_with("app.json"));
 
     // Should be able to rename
-    let renamed = AppPath::new(root_file.with_file_name("settings.toml"));
+    let renamed = AppPath::with(root_file.with_file_name("settings.toml"));
     assert!(renamed.ends_with("settings.toml"));
     assert_eq!(renamed.parent(), root_file.parent());
 }
@@ -433,7 +441,11 @@ fn test_into_inner_with_override() {
     // Test case 2: No override, should use default relative to exe_dir
     let app_path_default = AppPath::with_override("config.toml", None::<&str>);
     let inner_path_default: PathBuf = app_path_default.into_inner();
-    let expected_default = exe_dir().join("config.toml");
+    let expected_default = std::env::current_exe()
+        .unwrap()
+        .parent()
+        .unwrap()
+        .join("config.toml");
 
     assert_eq!(inner_path_default, expected_default);
     assert!(inner_path_default.ends_with("config.toml"));

@@ -13,24 +13,24 @@ impl AppPath {
     ///
     /// ```rust
     /// use app_path::AppPath;
-    /// use std::env;
+    /// use std::fs;
     ///
-    /// let temp_dir = env::temp_dir().join("app_path_parent_example");
-    ///
-    /// // Prepare directories for a log file
-    /// let log_file = AppPath::new(temp_dir.join("logs/2024/app.log"));
+    /// // Prepare directories for a log file relative to your app
+    /// let log_file = AppPath::with("logs/2024/app.log");
     /// log_file.create_parents()?; // Creates logs/2024/ directories
     ///
     /// // Parent directories exist, but file does not
-    /// assert!(temp_dir.join("logs").exists());
-    /// assert!(temp_dir.join("logs/2024").exists());
+    /// let logs_dir = AppPath::with("logs");
+    /// let year_dir = AppPath::with("logs/2024");
+    /// assert!(logs_dir.exists());
+    /// assert!(year_dir.exists());
     /// assert!(!log_file.exists()); // File not created, only parent dirs
     ///
     /// // Now you can write the file
-    /// std::fs::write(&log_file, "Log entry")?;
+    /// fs::write(&log_file, "Log entry")?;
     /// assert!(log_file.exists());
     ///
-    /// # std::fs::remove_dir_all(&temp_dir).ok();
+    /// # std::fs::remove_dir_all(&AppPath::with("logs")).ok();
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
     ///
@@ -38,25 +38,24 @@ impl AppPath {
     ///
     /// ```rust
     /// use app_path::AppPath;
-    /// use std::env;
-    ///
-    /// let temp_dir = env::temp_dir().join("app_path_complex_example");
+    /// use std::fs;
     ///
     /// // Create parents for config file
-    /// let config_file = AppPath::new(temp_dir.join("config/database/settings.toml"));
+    /// let config_file = AppPath::with("config/database/settings.toml");
     /// config_file.create_parents()?; // Creates config/database/ directories
     ///
     /// // Create parents for data file  
-    /// let data_file = AppPath::new(temp_dir.join("data/users/profiles.db"));
+    /// let data_file = AppPath::with("data/users/profiles.db");
     /// data_file.create_parents()?; // Creates data/users/ directories
     ///
     /// // All parent directories exist
-    /// assert!(temp_dir.join("config").exists());
-    /// assert!(temp_dir.join("config/database").exists());
-    /// assert!(temp_dir.join("data").exists());
-    /// assert!(temp_dir.join("data/users").exists());
+    /// assert!(AppPath::with("config").exists());
+    /// assert!(AppPath::with("config/database").exists());
+    /// assert!(AppPath::with("data").exists());
+    /// assert!(AppPath::with("data/users").exists());
     ///
-    /// # std::fs::remove_dir_all(&temp_dir).ok();
+    /// # std::fs::remove_dir_all(&AppPath::with("config")).ok();
+    /// # std::fs::remove_dir_all(&AppPath::with("data")).ok();
     /// # Ok::<(), app_path::AppPathError>(())
     /// ```
     ///
@@ -100,17 +99,14 @@ impl AppPath {
     ///
     /// ```rust
     /// use app_path::AppPath;
-    /// use std::env;
     ///
-    /// let temp_dir = env::temp_dir().join("app_path_dir_example");
-    ///
-    /// // Create a cache directory
-    /// let cache_dir = AppPath::new(temp_dir.join("cache"));
+    /// // Create a cache directory relative to your app
+    /// let cache_dir = AppPath::with("cache");
     /// cache_dir.create_dir()?; // Creates cache/ directory
     /// assert!(cache_dir.exists());
     /// assert!(cache_dir.is_dir());
     ///
-    /// # std::fs::remove_dir_all(&temp_dir).ok();
+    /// # std::fs::remove_dir_all(&cache_dir).ok();
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
     ///
@@ -118,22 +114,19 @@ impl AppPath {
     ///
     /// ```rust
     /// use app_path::AppPath;
-    /// use std::env;
-    ///
-    /// let temp_dir = env::temp_dir().join("app_path_nested_example");
     ///
     /// // Create deeply nested directories
-    /// let deep_dir = AppPath::new(temp_dir.join("data/backups/daily"));
+    /// let deep_dir = AppPath::with("data/backups/daily");
     /// deep_dir.create_dir()?; // Creates data/backups/daily/ directories
     /// assert!(deep_dir.exists());
     /// assert!(deep_dir.is_dir());
     ///
     /// // All parent directories are also created
-    /// let backups_dir = AppPath::new(temp_dir.join("data/backups"));
+    /// let backups_dir = AppPath::with("data/backups");
     /// assert!(backups_dir.exists());
     /// assert!(backups_dir.is_dir());
     ///
-    /// # std::fs::remove_dir_all(&temp_dir).ok();
+    /// # std::fs::remove_dir_all(&AppPath::with("data")).ok();
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
     ///
@@ -141,15 +134,12 @@ impl AppPath {
     ///
     /// ```rust
     /// use app_path::AppPath;
-    /// use std::env;
-    ///
-    /// let temp_dir = env::temp_dir().join("app_setup_example");
     ///
     /// // Set up application directory structure
-    /// let config_dir = AppPath::new(temp_dir.join("config"));
-    /// let data_dir = AppPath::new(temp_dir.join("data"));
-    /// let cache_dir = AppPath::new(temp_dir.join("cache"));
-    /// let logs_dir = AppPath::new(temp_dir.join("logs"));
+    /// let config_dir = AppPath::with("config");
+    /// let data_dir = AppPath::with("data");
+    /// let cache_dir = AppPath::with("cache");
+    /// let logs_dir = AppPath::with("logs");
     ///
     /// // Create all directories
     /// config_dir.create_dir()?;
@@ -168,7 +158,10 @@ impl AppPath {
     /// assert!(logs_dir.is_dir());
     /// assert!(daily_logs.is_dir());
     ///
-    /// # std::fs::remove_dir_all(&temp_dir).ok();
+    /// # std::fs::remove_dir_all(&config_dir).ok();
+    /// # std::fs::remove_dir_all(&data_dir).ok();
+    /// # std::fs::remove_dir_all(&cache_dir).ok();
+    /// # std::fs::remove_dir_all(&logs_dir).ok();
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
     ///
@@ -176,12 +169,9 @@ impl AppPath {
     ///
     /// ```rust
     /// use app_path::AppPath;
-    /// use std::env;
     ///
-    /// let temp_dir = env::temp_dir().join("app_comparison_example");
-    ///
-    /// let file_path = AppPath::new(temp_dir.join("logs/app.log"));
-    /// let dir_path = AppPath::new(temp_dir.join("logs"));
+    /// let file_path = AppPath::with("logs/app.log");
+    /// let dir_path = AppPath::with("logs");
     ///
     /// // For files: prepare parent directories
     /// file_path.create_parents()?; // Creates logs/ directory
@@ -193,7 +183,7 @@ impl AppPath {
     /// assert!(dir_path.exists()); // logs/ directory exists
     /// assert!(dir_path.is_dir()); // and it's definitely a directory
     ///
-    /// # std::fs::remove_dir_all(&temp_dir).ok();
+    /// # std::fs::remove_dir_all(&dir_path).ok();
     /// # Ok::<(), app_path::AppPathError>(())
     /// ```
     ///

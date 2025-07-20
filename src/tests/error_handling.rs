@@ -63,7 +63,7 @@ fn test_fallible_api_documentation_examples() {
     // Test the examples from the documentation work correctly
 
     // Example 1: Basic error handling pattern
-    match AppPath::try_new("config.toml") {
+    match AppPath::try_with("config.toml") {
         Ok(config) => {
             assert!(config.path().ends_with("config.toml"));
         }
@@ -75,7 +75,7 @@ fn test_fallible_api_documentation_examples() {
 
     // Example 2: Using ? operator (simulated)
     fn load_config() -> Result<AppPath, AppPathError> {
-        let config = AppPath::try_new("config.toml")?;
+        let config = AppPath::try_with("config.toml")?;
         Ok(config)
     }
 
@@ -84,9 +84,9 @@ fn test_fallible_api_documentation_examples() {
 
     // Example 3: Fallback strategy
     fn get_config_with_fallback() -> AppPath {
-        AppPath::try_new("config.toml").unwrap_or_else(|_| {
+        AppPath::try_with("config.toml").unwrap_or_else(|_| {
             let temp_config = std::env::temp_dir().join("myapp").join("config.toml");
-            AppPath::new(temp_config)
+            AppPath::with(temp_config)
         })
     }
 
@@ -178,7 +178,7 @@ fn test_create_parents_permission_error() {
     std::fs::set_permissions(&temp_dir, perms).unwrap();
 
     // Try to create a subdirectory (should fail with permission error)
-    let protected_file = AppPath::new(temp_dir.join("protected/file.txt"));
+    let protected_file = AppPath::with(temp_dir.join("protected/file.txt"));
     let result = protected_file.create_parents();
 
     // Restore write permissions for cleanup
@@ -213,7 +213,7 @@ fn test_create_dir_permission_error() {
     std::fs::set_permissions(&temp_dir, perms).unwrap();
 
     // Try to create a subdirectory (should fail with permission error)
-    let protected_dir = AppPath::new(temp_dir.join("protected"));
+    let protected_dir = AppPath::with(temp_dir.join("protected"));
     let result = protected_dir.create_dir();
 
     // Restore write permissions for cleanup
@@ -262,7 +262,7 @@ fn test_directory_creation_error_propagation() {
     std::fs::write(&blocking_file, "content").unwrap();
 
     // Try to create a directory with the same name as the file (should fail)
-    let blocked_path = AppPath::new(&blocking_file);
+    let blocked_path = AppPath::from(&blocking_file);
     let result = blocked_path.create_dir();
 
     // Clean up
@@ -291,7 +291,7 @@ fn test_create_parents_with_file_blocking_parent() {
     std::fs::write(&blocking_file, "content").unwrap();
 
     // Try to create parents for a path that needs "logs" as a directory
-    let log_file = AppPath::new(temp_dir.join("logs/app.log"));
+    let log_file = AppPath::with(temp_dir.join("logs/app.log"));
     let result = log_file.create_parents();
 
     // Clean up
@@ -303,74 +303,5 @@ fn test_create_parents_with_file_blocking_parent() {
             // Expected - can't create directory where file exists
         }
         _ => panic!("Expected IoError when file blocks parent creation, got: {result:?}"),
-    }
-}
-
-#[test]
-fn test_deprecated_methods_return_io_result() {
-    // Verify that deprecated methods still return std::io::Result for backwards compatibility
-    let temp_dir = std::env::temp_dir().join("app_path_deprecated_error_test");
-    std::fs::create_dir_all(&temp_dir).unwrap();
-
-    let test_path = AppPath::new(temp_dir.join("test/file.txt"));
-
-    // Test that deprecated methods return std::io::Result, not AppPathError
-    #[allow(deprecated)]
-    let result1 = test_path.ensure_parent_dirs();
-    assert!(result1.is_ok());
-
-    #[allow(deprecated)]
-    let result2 = test_path.ensure_dir_exists();
-    assert!(result2.is_ok());
-
-    #[allow(deprecated)]
-    let result3 = test_path.create_dir_all();
-    assert!(result3.is_ok());
-
-    // Clean up
-    std::fs::remove_dir_all(&temp_dir).ok();
-
-    // The key test: these should be std::io::Result<()>, not Result<(), AppPathError>
-    // This verifies backwards compatibility
-    let _: std::io::Result<()> = result1;
-    let _: std::io::Result<()> = result2;
-    let _: std::io::Result<()> = result3;
-}
-
-#[cfg(unix)]
-#[test]
-fn test_deprecated_methods_io_error_type() {
-    use std::os::unix::fs::PermissionsExt;
-
-    // Test that deprecated methods return std::io::Error, not AppPathError
-    let temp_dir = std::env::temp_dir().join("app_path_deprecated_io_error_test");
-    std::fs::create_dir_all(&temp_dir).unwrap();
-
-    // Make it read-only
-    let mut perms = std::fs::metadata(&temp_dir).unwrap().permissions();
-    perms.set_mode(0o444);
-    std::fs::set_permissions(&temp_dir, perms).unwrap();
-
-    let protected_path = AppPath::new(temp_dir.join("protected/file.txt"));
-
-    #[allow(deprecated)]
-    let result = protected_path.ensure_parent_dirs();
-
-    // Restore permissions for cleanup
-    let mut perms = std::fs::metadata(&temp_dir).unwrap().permissions();
-    perms.set_mode(0o755);
-    std::fs::set_permissions(&temp_dir, perms).unwrap();
-    std::fs::remove_dir_all(&temp_dir).ok();
-
-    // Should be std::io::Error, not AppPathError
-    match result {
-        Err(io_err) => {
-            let _: std::io::Error = io_err; // Type check
-            assert!(
-                io_err.to_string().contains("Permission denied")
-                    || io_err.to_string().contains("Access is denied")
-            );
-        }
-        Ok(_) => panic!("Expected permission error"),
     }
 }
