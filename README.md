@@ -3,8 +3,8 @@
 **Create portable applications that keep files together with the executable.**
 
 [![Crates.io](https://img.shields.io/crates/v/app-path.svg)](https://crates.io/crates/app-path)
-[![Documentation](https://docs.rs/app-path/badge.svg)](https://docs.rs/app-path)
 [![License: MIT OR Apache-2.0](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue.svg)](LICENSE-MIT)
+[![Documentation](https://docs.rs/app-path/badge.svg)](https://docs.rs/app-path)
 [![CI](https://github.com/DK26/app-path-rs/workflows/CI/badge.svg)](https://github.com/DK26/app-path-rs/actions)
 
 Simple, zero-dependency library for creating portable applications where configuration, data, and executable stay together as a deployable unit.
@@ -194,6 +194,19 @@ match AppPath::try_with("config.toml") {
     }
     Err(AppPathError::InvalidExecutablePath(msg)) => {
         eprintln!("Invalid executable path: {msg}");
+    }
+    Err(AppPathError::IoError(io_err)) => {
+        eprintln!("I/O operation failed: {io_err}");
+        // Access original error details:
+        match io_err.kind() {
+            std::io::ErrorKind::PermissionDenied => {
+                eprintln!("Permission denied - try running with elevated privileges");
+            }
+            std::io::ErrorKind::NotFound => {
+                eprintln!("Parent directory doesn't exist");
+            }
+            _ => eprintln!("Other I/O error: {io_err}"),
+        }
     }
 }
 ```

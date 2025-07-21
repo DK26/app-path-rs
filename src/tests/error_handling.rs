@@ -1,4 +1,5 @@
 use crate::{AppPath, AppPathError};
+use std::error::Error;
 use std::fmt::Write;
 
 #[test]
@@ -35,17 +36,27 @@ fn test_error_type_debug() {
 }
 
 #[test]
-fn test_error_type_equality() {
-    // Test that error types implement PartialEq and Eq with realistic scenarios
-    let error1 = AppPathError::ExecutableNotFound("Current executable access failed".to_string());
-    let error2 = AppPathError::ExecutableNotFound("Current executable access failed".to_string());
-    let error3 = AppPathError::ExecutableNotFound("Failed to access executable file".to_string());
-    let error4 =
+fn test_error_type_functionality() {
+    // Test that error types work correctly with realistic scenarios
+    let exec_error =
+        AppPathError::ExecutableNotFound("Current executable access failed".to_string());
+    let invalid_error =
         AppPathError::InvalidExecutablePath("Library file is not a valid executable".to_string());
 
-    assert_eq!(error1, error2);
-    assert_ne!(error1, error3);
-    assert_ne!(error1, error4);
+    // Test that we can match on error types
+    match exec_error {
+        AppPathError::ExecutableNotFound(msg) => {
+            assert!(msg.contains("executable access failed"));
+        }
+        _ => panic!("Wrong error type"),
+    }
+
+    match invalid_error {
+        AppPathError::InvalidExecutablePath(msg) => {
+            assert!(msg.contains("not a valid executable"));
+        }
+        _ => panic!("Wrong error type"),
+    }
 }
 
 #[test]
@@ -104,9 +115,9 @@ fn test_io_error_variant_from_real_operation() {
         Err(io_error) => {
             let app_error = AppPathError::from(io_error);
             match app_error {
-                AppPathError::IoError(msg) => {
+                AppPathError::IoError(io_err) => {
                     // The error message will naturally be OS-appropriate
-                    assert!(!msg.is_empty());
+                    assert!(!io_err.to_string().is_empty());
                 }
                 _ => panic!("Expected IoError variant"),
             }
@@ -191,7 +202,8 @@ fn test_create_parents_permission_error() {
 
     // Check that we got an IoError
     match result {
-        Err(AppPathError::IoError(msg)) => {
+        Err(AppPathError::IoError(io_err)) => {
+            let msg = io_err.to_string();
             assert!(msg.contains("Permission denied") || msg.contains("Access is denied"));
         }
         _ => panic!("Expected IoError for permission denied, got: {result:?}"),
@@ -226,7 +238,8 @@ fn test_create_dir_permission_error() {
 
     // Check that we got an IoError
     match result {
-        Err(AppPathError::IoError(msg)) => {
+        Err(AppPathError::IoError(io_err)) => {
+            let msg = io_err.to_string();
             assert!(msg.contains("Permission denied") || msg.contains("Access is denied"));
         }
         _ => panic!("Expected IoError for permission denied, got: {result:?}"),
@@ -238,7 +251,7 @@ fn test_error_variant_completeness() {
     // Test all error variants for completeness
     let exec_error = AppPathError::ExecutableNotFound("exec error".to_string());
     let invalid_error = AppPathError::InvalidExecutablePath("invalid path".to_string());
-    let io_error = AppPathError::IoError("io error".to_string());
+    let io_error = AppPathError::IoError(std::io::Error::other("io error"));
 
     // Test Display
     assert!(format!("{exec_error}").contains("Failed to determine executable location"));
@@ -249,6 +262,115 @@ fn test_error_variant_completeness() {
     assert!(format!("{exec_error:?}").contains("ExecutableNotFound"));
     assert!(format!("{invalid_error:?}").contains("InvalidExecutablePath"));
     assert!(format!("{io_error:?}").contains("IoError"));
+}
+
+#[test]
+fn test_error_source_chain() {
+    // Test error source chain for IoError
+    let io_err = std::io::Error::new(std::io::ErrorKind::PermissionDenied, "access denied");
+    let app_error = AppPathError::from(io_err);
+
+    // Test that we can access the source error
+    assert!(app_error.source().is_some());
+    match app_error {
+        AppPathError::IoError(inner) => {
+            assert_eq!(inner.kind(), std::io::ErrorKind::PermissionDenied);
+            assert!(inner.to_string().contains("access denied"));
+        }
+        _ => panic!("Expected IoError variant"),
+    }
+}
+
+#[test]
+fn test_io_error_comprehensive_access() {
+    // Test all the key benefits of preserving std::io::Error
+    use std::io::ErrorKind;
+
+    // Test different error kinds
+    let test_cases = [
+        (ErrorKind::NotFound, "file not found"),
+        (ErrorKind::PermissionDenied, "access denied"),
+        (ErrorKind::AlreadyExists, "already exists"),
+        (ErrorKind::InvalidInput, "invalid input"),
+        (ErrorKind::TimedOut, "timed out"),
+    ];
+
+    for (kind, message) in test_cases {
+        let io_err = std::io::Error::new(kind, message);
+        let app_error = AppPathError::from(io_err);
+
+        // Test error source chain first
+        assert!(app_error.source().is_some());
+
+        // Test that we can downcast the source back to io::Error
+        let source = app_error.source().unwrap();
+        assert!(source.downcast_ref::<std::io::Error>().is_some());
+
+        match app_error {
+            AppPathError::IoError(inner) => {
+                // Test kind() access
+                assert_eq!(inner.kind(), kind);
+
+                // Test message preservation
+                assert!(inner.to_string().contains(message));
+            }
+            _ => panic!("Expected IoError variant for kind: {kind:?}"),
+        }
+    }
+}
+
+#[test]
+fn test_io_error_raw_os_error_access() {
+    // Test access to raw OS error codes when available
+
+    // Create an error that might have an OS error code
+    // We'll test the API even if the specific code isn't guaranteed
+    let io_err = std::io::Error::from(std::io::ErrorKind::PermissionDenied);
+    let app_error = AppPathError::from(io_err);
+
+    match app_error {
+        AppPathError::IoError(inner) => {
+            // Test that raw_os_error() method is accessible
+            // Note: The actual value depends on the platform and context
+            let _os_error = inner.raw_os_error(); // Option<i32>
+
+            // Test that we can use it in error handling logic
+            match inner.raw_os_error() {
+                Some(code) => {
+                    // OS-specific error code is available
+                    assert!(code != 0); // Usually non-zero for actual errors
+                }
+                None => {
+                    // No OS-specific code, but that's also valid
+                    // Just ensure the method is callable
+                }
+            }
+        }
+        _ => panic!("Expected IoError variant"),
+    }
+}
+
+#[test]
+fn test_io_error_path_context_preservation() {
+    // Test that path context is preserved when using the (io::Error, &PathBuf) conversion
+    use std::path::PathBuf;
+
+    let path = PathBuf::from("/some/test/path");
+    let io_err = std::io::Error::new(std::io::ErrorKind::NotFound, "file not found");
+    let app_error = AppPathError::from((io_err, &path));
+
+    match app_error {
+        AppPathError::IoError(inner) => {
+            // Verify the error kind is preserved
+            assert_eq!(inner.kind(), std::io::ErrorKind::NotFound);
+
+            // Verify path context is included in the message
+            let message = inner.to_string();
+            assert!(message.contains("file not found"));
+            assert!(message.contains("/some/test/path"));
+        }
+        _ => panic!("Expected IoError variant"),
+    }
 }
 
 #[test]
