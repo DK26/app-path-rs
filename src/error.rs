@@ -46,11 +46,20 @@ use std::path::PathBuf;
 ///     }
 ///     Err(AppPathError::IoError(io_err)) => {
 ///         eprintln!("I/O operation failed: {io_err}");
-///         // Handle specific I/O error
+///         // Handle specific I/O error types
+///         match io_err.kind() {
+///             std::io::ErrorKind::PermissionDenied => {
+///                 eprintln!("Permission denied - check file permissions");
+///             }
+///             std::io::ErrorKind::NotFound => {
+///                 eprintln!("File or directory not found");
+///             }
+///             _ => eprintln!("Other I/O error: {io_err}"),
+///         }
 ///     }
 /// }
 /// ```
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug)]
 pub enum AppPathError {
     /// Failed to determine the current executable path.
     ///
@@ -71,7 +80,12 @@ pub enum AppPathError {
     /// - Disk space is insufficient
     /// - Path contains invalid characters for the filesystem
     /// - Network filesystem issues
-    IoError(String),
+    ///
+    /// The original `std::io::Error` is preserved, allowing users to:
+    /// - Check specific error kinds (`error.kind()`)
+    /// - Access OS error codes (`error.raw_os_error()`)
+    /// - Handle different I/O errors appropriately
+    IoError(std::io::Error),
 }
 
 impl std::fmt::Display for AppPathError {
@@ -83,18 +97,25 @@ impl std::fmt::Display for AppPathError {
             AppPathError::InvalidExecutablePath(msg) => {
                 write!(f, "Invalid executable path: {msg}")
             }
-            AppPathError::IoError(msg) => {
-                write!(f, "I/O operation failed: {msg}")
+            AppPathError::IoError(err) => {
+                write!(f, "I/O operation failed: {err}")
             }
         }
     }
 }
 
-impl std::error::Error for AppPathError {}
+impl std::error::Error for AppPathError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            AppPathError::IoError(err) => Some(err),
+            _ => None,
+        }
+    }
+}
 
 impl From<std::io::Error> for AppPathError {
     fn from(err: std::io::Error) -> Self {
-        AppPathError::IoError(err.to_string())
+        AppPathError::IoError(err)
     }
 }
 
@@ -119,7 +140,10 @@ impl From<std::io::Error> for AppPathError {
 /// ```
 impl From<(std::io::Error, &PathBuf)> for AppPathError {
     fn from((err, path): (std::io::Error, &PathBuf)) -> Self {
-        AppPathError::IoError(format!("{err} (path: {})", path.display()))
+        // Create a new io::Error that includes path context in the message
+        let kind = err.kind();
+        let msg = format!("{err} (path: {})", path.display());
+        AppPathError::IoError(std::io::Error::new(kind, msg))
     }
 }
 

@@ -67,10 +67,10 @@ fn test_error_trait_io_error_not_found_from_real_operation() {
 
 #[test]
 fn test_error_trait_source_for_io_error() {
-    // IoError variant doesn't implement source() since we convert to String
-    // but verify the trait is still implemented with a realistic error
-    let error = AppPathError::IoError("I/O operation failed".to_string());
-    assert!(std::error::Error::source(&error).is_none());
+    // IoError variant now preserves the original io::Error and implements source()
+    let io_error = std::io::Error::new(std::io::ErrorKind::PermissionDenied, "access denied");
+    let error = AppPathError::IoError(io_error);
+    assert!(std::error::Error::source(&error).is_some());
 }
 
 #[test]

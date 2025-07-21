@@ -7,6 +7,62 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.0] - 2025-07-21
+
+### 🚀 **Enhanced Error Handling**
+
+#### **Breaking Changes**
+- **`AppPathError::IoError` now preserves original `std::io::Error`** instead of converting to `String`
+  - **Before**: `IoError(String)` - Lost all original error information
+  - **After**: `IoError(std::io::Error)` - Preserves full error context
+  - **Migration**: Update pattern matching from `IoError(msg)` to `IoError(io_err)`
+
+#### **New Capabilities**
+- **Enhanced error inspection**: Access `error.kind()`, `error.raw_os_error()`, and all `std::io::Error` methods
+- **Proper error chaining**: `std::error::Error::source()` now returns the original I/O error
+- **Better error handling patterns**: Users can now handle specific I/O error types appropriately
+
+#### **API Changes**
+- **Removed derived traits**: `Clone`, `PartialEq`, and `Eq` are no longer auto-derived for `AppPathError`
+  - This follows Rust ecosystem best practices for error types containing `std::io::Error`
+  - Error types rarely need these traits in practice
+
+#### **Benefits for Users**
+```rust
+// Before v1.1.0 - limited error information
+match app_path_error {
+    AppPathError::IoError(msg) => {
+        eprintln!("I/O error: {}", msg); // Only had string message
+    }
+}
+
+// v1.1.0+ - full error context preserved
+match app_path_error {
+    AppPathError::IoError(io_err) => {
+        match io_err.kind() {
+            std::io::ErrorKind::PermissionDenied => {
+                // Handle permission errors specifically
+            }
+            std::io::ErrorKind::NotFound => {
+                // Handle missing file/directory
+            }
+            _ => {
+                // Handle other I/O errors
+            }
+        }
+        
+        // Access OS error codes if available
+        if let Some(code) = io_err.raw_os_error() {
+            eprintln!("OS error code: {}", code);
+        }
+    }
+}
+```
+
+### 📚 **Documentation**
+- **Updated README.md** - Added comprehensive error handling examples showing new IoError capabilities
+- **Enhanced test coverage** - Added tests for error kind access, raw OS error codes, and error source chaining
+
 ## [1.0.2] - 2025-07-21
 
 ### 🔧 **Version Bump**

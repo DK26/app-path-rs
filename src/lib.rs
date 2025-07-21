@@ -290,7 +290,22 @@ macro_rules! app_path {
 ///
 /// match try_app_path!("config.toml") {
 ///     Ok(config) => println!("Config: {}", config.display()),
-///     Err(e) => eprintln!("Error: {e}"),
+///     Err(AppPathError::ExecutableNotFound(msg)) => {
+///         eprintln!("Cannot find executable: {msg}");
+///     }
+///     Err(AppPathError::InvalidExecutablePath(msg)) => {
+///         eprintln!("Invalid executable path: {msg}");
+///     }
+///     Err(AppPathError::IoError(io_err)) => {
+///         eprintln!("I/O operation failed: {io_err}");
+///         // Access original error details for specific handling
+///         match io_err.kind() {
+///             std::io::ErrorKind::PermissionDenied => {
+///                 eprintln!("Permission denied - check file permissions");
+///             }
+///             _ => eprintln!("Other I/O error"),
+///         }
+///     }
 /// }
 /// ```
 ///
