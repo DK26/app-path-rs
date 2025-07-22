@@ -87,22 +87,7 @@ app_path!("logs/app.log").create_parents()?;  // Creates `logs/` for the `app.lo
 app_path!("temp").create_dir()?;  // Creates `temp/` directory itself
 ```
 
-### Fallible `try_app_path!` Macro
-
-```rust
-use app_path::try_app_path;
-
-// Fallible base directory
-let app_base = try_app_path!()?;  
-let config = try_app_path!("config.toml")?;
-let database = try_app_path!("data/users.db", env = "DATABASE_PATH")?;
-
-// Error handling
-match try_app_path!("logs/app.log") {
-    Ok(log_path) => log_path.create_parents()?,
-    Err(e) => eprintln!("Failed: {e}"),
-}
-```
+> **Note**: Use `try_app_path!` instead of `app_path!` when you need `Result` return values for explicit error handling (same syntax, just returns `Result<AppPath, AppPathError>` instead of panicking).
 
 ### Constructor API
 
@@ -112,11 +97,19 @@ use app_path::AppPath;
 // Basic constructors
 let app_base = AppPath::new();                       // Executable directory
 let config = AppPath::with("config.toml");           // App base + path
-let database = AppPath::try_with("data/users.db")?;  // Fallible version
 
 // Override constructors
 let config = AppPath::with_override("config.toml", std::env::var("CONFIG_PATH").ok());
-let database = AppPath::try_with_override("data/users.db", std::env::var("DB_PATH").ok())?;
+
+// Function-based override constructors
+let logs = AppPath::with_override_fn("logs", || {
+    std::env::var("XDG_STATE_HOME")
+        .or_else(|_| std::env::var("HOME").map(|h| format!("{h}/.local/state/myapp")))
+        .ok()
+});
+```
+
+> **Note**: All constructors have `try_*` variants that return `Result` instead of panicking (e.g., `try_new()`, `try_with()`, `try_with_override()`, `try_with_override_fn()`).
 ```
 
 ## Real-World Examples
