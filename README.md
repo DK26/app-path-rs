@@ -110,7 +110,6 @@ let logs = AppPath::with_override_fn("logs", || {
 ```
 
 > **Note**: All constructors have `try_*` variants that return `Result` instead of panicking (e.g., `try_new()`, `try_with()`, `try_with_override()`, `try_with_override_fn()`).
-```
 
 ## Real-World Examples
 
@@ -260,7 +259,7 @@ let data_path = AppPath::with(&config.data_dir);
 
 ```toml
 [dependencies]
-app-path = "1.0"
+app-path = "1.1"
 ```
 
 ## Documentation
