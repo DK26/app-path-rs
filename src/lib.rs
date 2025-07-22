@@ -341,6 +341,7 @@ macro_rules! app_path {
 /// - [`app_path!`] - Panicking version with identical syntax
 /// - [`AppPath::try_new()`] - Constructor equivalent
 /// - [`AppPath::try_with_override()`] - Constructor with override equivalent
+/// - [`AppPath::try_with_override_fn()`] - Constructor with function-based override equivalent
 #[macro_export]
 macro_rules! try_app_path {
     () => {

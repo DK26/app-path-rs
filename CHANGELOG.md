@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.1] - 2025-07-22
+
+### 📚 **Documentation & Discoverability Improvements**
+
+#### **Enhanced Documentation**
+- **Streamlined README.md**: Removed redundant `try_app_path!` examples that duplicated `app_path!` syntax
+- **Focused Constructor API**: Removed `try_*` method examples, keeping only core non-try methods
+- **Improved keyword discoverability**: Updated crate keywords to include "config" for better search results
+- **Completed function-based override documentation**: Added missing `try_with_override_fn()` examples across all API sections
+- **Cleaner "See Also" references**: Added complete constructor references in macro documentation
+
+#### **Benefits for Users**
+- **Reduced documentation bloat**: Eliminated 15+ lines of redundant examples
+- **Clearer focus**: Documentation now highlights primary usage patterns without obvious variants
+- **Better discoverability**: Improved crate findability for configuration file use cases
+- **Complete API coverage**: All function-based override patterns now properly documented
+
 ## [1.1.0] - 2025-07-21
 
 ### 🚀 **Enhanced Error Handling**
