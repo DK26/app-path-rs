@@ -65,9 +65,14 @@ fn test_from_pathbuf() {
 
 #[test]
 fn test_from_str() {
-    // AppPath doesn't implement FromStr trait, use new() instead
-    let app_path = AppPath::with("config.toml");
+    use std::str::FromStr;
+
+    let app_path = AppPath::from_str("config.toml").unwrap();
     assert!(app_path.ends_with("config.toml"));
+
+    // Should also work with paths containing subdirectories
+    let nested_path = AppPath::from_str("data/settings.json").unwrap();
+    assert!(nested_path.ends_with("settings.json"));
 }
 
 // === Borrow Trait Tests ===

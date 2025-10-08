@@ -9,6 +9,7 @@ use std::cmp::Ordering;
 use std::hash::{Hash, Hasher};
 use std::ops::Deref;
 use std::path::{Path, PathBuf};
+use std::str::FromStr;
 
 // === Core Display and Conversion Traits ===
 
@@ -91,6 +92,35 @@ impl From<&PathBuf> for AppPath {
     #[inline]
     fn from(path: &PathBuf) -> Self {
         Self::with(path)
+    }
+}
+
+impl FromStr for AppPath {
+    type Err = crate::AppPathError;
+
+    /// Parses a string into an `AppPath`.
+    ///
+    /// This enables direct string parsing and makes `AppPath` compatible with
+    /// deserialization libraries like `serde` that rely on `FromStr`.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use app_path::AppPath;
+    /// use std::str::FromStr;
+    ///
+    /// let app_path = AppPath::from_str("config.toml").unwrap();
+    /// assert!(app_path.ends_with("config.toml"));
+    /// ```
+    ///
+    /// # Errors
+    ///
+    /// Returns [`AppPathError`](crate::AppPathError) if the executable location cannot be determined.
+    /// After the first successful call to any AppPath method, this will never return an error
+    /// due to global caching.
+    #[inline]
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Self::try_with(s)
     }
 }
 
